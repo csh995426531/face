@@ -66,6 +66,7 @@ http://222.92.222.140:39090/gb0mx9cg/
 - 切换 `buffalo_l`、`ArcFace`、`Facenet512`、`GhostFaceNet` 等候选配置
 - 可选填写自定义阈值
 - 查看分数、判断、耗时和原始 JSON
+- 图片本地预览失败时，会自动请求服务端转成标准 JPEG 预览
 
 首次运行某个模型会下载权重并加载模型，等待时间会更长。
 
@@ -86,6 +87,18 @@ curl -L --retry 20 --retry-delay 5 -C - \
   -o .models/insightface/models/buffalo_l.zip \
   https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip
 ```
+
+如果 GitHub 下载得到的文件只有几十字节，说明拿到的是错误响应，不是模型包。可以改用 SourceForge 的 InsightFace 镜像：
+
+```bash
+rm -f .models/insightface/models/buffalo_l.zip
+curl -L --retry 20 --retry-delay 5 -C - \
+  -o .models/insightface/models/buffalo_l.zip \
+  "https://sourceforge.net/projects/insightface.mirror/files/v0.7/buffalo_l.zip/download"
+ls -lh .models/insightface/models/buffalo_l.zip
+```
+
+正常文件大小约 288MB。
 
 下载完成后解压：
 

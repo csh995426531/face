@@ -398,16 +398,39 @@
             img.style.display = "block";
           };
           img.onerror = () => {
-            img.style.display = "none";
-            note.textContent = `浏览器无法预览该图片：${file.name}。如果是 HEIC，请先转成 JPG/PNG。`;
+            serverPreview(file, img, note);
           };
           img.src = reader.result;
         };
         reader.onerror = () => {
-          img.style.display = "none";
-          note.textContent = `图片读取失败：${file.name}`;
+          serverPreview(file, img, note);
         };
         reader.readAsDataURL(file);
+      }
+
+      async function serverPreview(file, img, note) {
+        note.textContent = `浏览器无法直接预览，正在请求服务端转换：${file.name}`;
+        const form = new FormData();
+        form.append("image", file);
+        try {
+          const response = await fetch(apiUrl("api/preview"), { method: "POST", body: form });
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+          const blob = await response.blob();
+          img.onload = () => {
+            note.remove();
+            img.style.display = "block";
+          };
+          img.onerror = () => {
+            img.style.display = "none";
+            note.textContent = `服务端已转换，但浏览器仍无法显示：${file.name}`;
+          };
+          img.src = URL.createObjectURL(blob);
+        } catch (error) {
+          img.style.display = "none";
+          note.textContent = `无法预览：${file.name}。仍可尝试直接比对；如果比对也失败，请转成标准 JPG/PNG。`;
+        }
       }
 
       function selectedConfig() {

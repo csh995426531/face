@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+import cv2
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from compare import compare_buffalo, compare_deepface
@@ -106,6 +107,11 @@ def compare_images(
     return run_compare(config_id, image_a, image_b, threshold)
 
 
+@app.post("/api/preview")
+def preview_image(image: UploadFile = File(...)):
+    return render_preview(image)
+
+
 @app.post("/{prefix:path}/api/compare")
 def prefixed_compare_images(
     prefix: str,
@@ -117,9 +123,36 @@ def prefixed_compare_images(
     return run_compare(config_id, image_a, image_b, threshold)
 
 
+@app.post("/{prefix:path}/api/preview")
+def prefixed_preview_image(prefix: str, image: UploadFile = File(...)):
+    return render_preview(image)
+
+
 @app.get("/{prefix:path}")
 def prefixed_index(prefix: str):
     return FileResponse(STATIC_DIR / "index.html")
+
+
+def render_preview(image: UploadFile):
+    path = save_upload(image)
+    try:
+        frame = cv2.imread(path)
+        if frame is None:
+            raise HTTPException(status_code=415, detail="server cannot decode this image")
+        height, width = frame.shape[:2]
+        max_side = 900
+        scale = min(1.0, max_side / max(height, width))
+        if scale < 1.0:
+            frame = cv2.resize(frame, (int(width * scale), int(height * scale)), interpolation=cv2.INTER_AREA)
+        ok, encoded = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
+        if not ok:
+            raise HTTPException(status_code=500, detail="failed to encode preview")
+        return Response(content=encoded.tobytes(), media_type="image/jpeg")
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
 
 
 def run_compare(
