@@ -162,6 +162,15 @@
         display: none;
       }
 
+      .preview-note {
+        padding: 12px;
+        color: var(--muted);
+        font-family: ui-sans-serif, "Avenir Next", "Noto Sans SC", sans-serif;
+        font-size: 12px;
+        line-height: 1.5;
+        text-align: center;
+      }
+
       .drop-copy {
         padding: 10px;
         font-family: ui-sans-serif, "Avenir Next", "Noto Sans SC", sans-serif;
@@ -368,14 +377,37 @@
 
       function preview(input, imgId) {
         const img = document.getElementById(imgId);
+        const note = img.parentElement.querySelector(".preview-note") || document.createElement("div");
+        note.className = "preview-note";
         const file = input.files[0];
         if (!file) {
           img.style.display = "none";
           img.removeAttribute("src");
+          note.textContent = "未选择图片";
+          img.parentElement.appendChild(note);
           return;
         }
-        img.src = URL.createObjectURL(file);
-        img.style.display = "block";
+
+        note.textContent = `读取中：${file.name}`;
+        img.parentElement.appendChild(note);
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          img.onload = () => {
+            note.remove();
+            img.style.display = "block";
+          };
+          img.onerror = () => {
+            img.style.display = "none";
+            note.textContent = `浏览器无法预览该图片：${file.name}。如果是 HEIC，请先转成 JPG/PNG。`;
+          };
+          img.src = reader.result;
+        };
+        reader.onerror = () => {
+          img.style.display = "none";
+          note.textContent = `图片读取失败：${file.name}`;
+        };
+        reader.readAsDataURL(file);
       }
 
       function selectedConfig() {
@@ -388,9 +420,26 @@
         rank.textContent = `${config.rank} · ${config.score_direction}`;
       }
 
+      function apiUrl(path) {
+        const pathname = window.location.pathname.endsWith("/")
+          ? window.location.pathname
+          : `${window.location.pathname}/`;
+        return `${pathname}${path}`;
+      }
+
+      async function readPayload(response) {
+        const text = await response.text();
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          const snippet = text.replace(/\s+/g, " ").slice(0, 300);
+          throw new Error(`服务没有返回 JSON，HTTP ${response.status}。通常是平台代理超时、端口映射页面或模型下载过程中断。返回片段：${snippet}`);
+        }
+      }
+
       async function loadConfigs() {
-        const response = await fetch("api/configs");
-        configs = await response.json();
+        const response = await fetch(apiUrl("api/configs"));
+        configs = await readPayload(response);
         configSelect.innerHTML = configs
           .map((config) => `<option value="${config.id}">${config.rank} · ${config.label}</option>`)
           .join("");
@@ -417,8 +466,8 @@
         verdict.className = "verdict";
 
         try {
-          const response = await fetch("api/compare", { method: "POST", body: form });
-          const data = await response.json();
+          const response = await fetch(apiUrl("api/compare"), { method: "POST", body: form });
+          const data = await readPayload(response);
           json.textContent = JSON.stringify(data, null, 2);
 
           if (!response.ok) {

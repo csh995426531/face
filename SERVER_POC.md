@@ -34,6 +34,12 @@ pip install -r requirements.txt
 
 如果安装 `insightface` 时编译失败，通常是系统缺少编译工具或 Python 头文件。优先换平台内置的 PyTorch/Python 开发镜像，不要在服务器上做系统级改动。
 
+建议把模型缓存放在项目目录，方便查看、迁移和清理：
+
+```bash
+export INSIGHTFACE_ROOT="$PWD/.models/insightface"
+```
+
 ## 4. 启动 Web 页面
 
 ```bash
@@ -62,6 +68,49 @@ http://222.92.222.140:39090/gb0mx9cg/
 - 查看分数、判断、耗时和原始 JSON
 
 首次运行某个模型会下载权重并加载模型，等待时间会更长。
+
+如果点击比对后浏览器报“服务没有返回 JSON”或服务端出现下载进度条，先看终端。类似下面这种输出表示正在下载 `buffalo_l` 模型权重，不是程序卡死：
+
+```text
+download_path: /root/.insightface/models/buffalo_l
+Downloading .../buffalo_l.zip ...
+```
+
+这个下载可能会很慢，尤其是从 GitHub 拉取。等下载完成后再次点击比对，后续会直接使用本地缓存。
+
+如果下载速度长期只有几十 KB/s，建议先停止服务，然后手动断点续传 `buffalo_l.zip`：
+
+```bash
+mkdir -p .models/insightface/models
+curl -L --retry 20 --retry-delay 5 -C - \
+  -o .models/insightface/models/buffalo_l.zip \
+  https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip
+```
+
+下载完成后解压：
+
+```bash
+python - <<'PY'
+import zipfile
+from pathlib import Path
+
+zip_path = Path(".models/insightface/models/buffalo_l.zip")
+out_dir = Path(".models/insightface/models/buffalo_l")
+out_dir.mkdir(parents=True, exist_ok=True)
+
+with zipfile.ZipFile(zip_path) as zf:
+    zf.extractall(out_dir)
+
+print("extracted to", out_dir)
+PY
+```
+
+然后重新启动：
+
+```bash
+export INSIGHTFACE_ROOT="$PWD/.models/insightface"
+uvicorn app:app --host 0.0.0.0 --port 80
+```
 
 ## 5. 命令行单次测试
 

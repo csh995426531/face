@@ -1,7 +1,9 @@
 import argparse
 import json
+import os
 import time
 from functools import lru_cache
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -23,7 +25,8 @@ def parse_args():
 def get_buffalo_app():
     from insightface.app import FaceAnalysis
 
-    app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
+    insightface_root = os.environ.get("INSIGHTFACE_ROOT", str(Path.cwd() / ".models" / "insightface"))
+    app = FaceAnalysis(name="buffalo_l", root=insightface_root, providers=["CPUExecutionProvider"])
     app.prepare(ctx_id=-1, det_size=(640, 640))
     return app
 
