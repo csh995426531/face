@@ -90,10 +90,34 @@ def list_configs():
     ]
 
 
+def detect_image_type(data: bytes) -> str | None:
+    if data.startswith(b"version https://git-lfs.github.com/spec/"):
+        return "git_lfs_pointer"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpeg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if data[:12].endswith(b"ftyp"):
+        return "heic_or_mp4_container"
+    if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+        return "gif"
+    if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "webp"
+    return None
+
+
 def save_upload(upload: UploadFile) -> str:
     suffix = Path(upload.filename or "image.jpg").suffix or ".jpg"
+    data = upload.file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail=f"{upload.filename or 'image'} is empty; upload did not include file bytes")
+    image_type = detect_image_type(data)
+    if image_type == "git_lfs_pointer":
+        raise HTTPException(status_code=415, detail=f"{upload.filename or 'image'} is a Git LFS pointer, not an image; run git lfs pull or download the real file")
+    if image_type == "heic_or_mp4_container":
+        raise HTTPException(status_code=415, detail=f"{upload.filename or 'image'} looks like HEIC/HEIF; convert it to JPEG or PNG first")
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(upload.file.read())
+        tmp.write(data)
         return tmp.name
 
 

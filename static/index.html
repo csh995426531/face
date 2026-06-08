@@ -374,6 +374,8 @@
       const runHint = document.getElementById("runHint");
 
       let configs = [];
+      const MAX_UPLOAD_SIDE = 1024;
+      const JPEG_QUALITY = 0.84;
 
       function preview(input, imgId) {
         const img = document.getElementById(imgId);
@@ -388,7 +390,17 @@
           return;
         }
 
-        note.textContent = `读取中：${file.name}`;
+        const fileSize = file.size >= 1024 * 1024
+          ? `${(file.size / 1024 / 1024).toFixed(2)} MB`
+          : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+        if (file.size === 0) {
+          img.style.display = "none";
+          note.textContent = `文件为空：${file.name}`;
+          img.parentElement.appendChild(note);
+          return;
+        }
+
+        note.textContent = `读取中：${file.name} · ${fileSize}`;
         img.parentElement.appendChild(note);
 
         const reader = new FileReader();
@@ -431,6 +443,44 @@
           img.style.display = "none";
           note.textContent = `无法预览：${file.name}。仍可尝试直接比对；如果比对也失败，请转成标准 JPG/PNG。`;
         }
+      }
+
+      function loadImageFromFile(file) {
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(file);
+          const image = new Image();
+          image.onload = () => {
+            URL.revokeObjectURL(url);
+            resolve(image);
+          };
+          image.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error(`浏览器无法解码图片：${file.name}`));
+          };
+          image.src = url;
+        });
+      }
+
+      async function compressImageFile(file) {
+        const image = await loadImageFromFile(file);
+        const scale = Math.min(1, MAX_UPLOAD_SIDE / Math.max(image.naturalWidth, image.naturalHeight));
+        const width = Math.max(1, Math.round(image.naturalWidth * scale));
+        const height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, 0, width, height);
+
+        const blob = await new Promise((resolve, reject) => {
+          canvas.toBlob(
+            (value) => value ? resolve(value) : reject(new Error(`图片压缩失败：${file.name}`)),
+            "image/jpeg",
+            JPEG_QUALITY
+          );
+        });
+
+        return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
       }
 
       function selectedConfig() {
@@ -477,18 +527,26 @@
           return;
         }
 
-        const form = new FormData();
-        form.append("config_id", configSelect.value);
-        form.append("image_a", imageA.files[0]);
-        form.append("image_b", imageB.files[0]);
-        form.append("threshold", threshold.value);
-
         runButton.disabled = true;
-        runHint.textContent = "比对中，首次运行可能需要下载和加载模型。";
+        runHint.textContent = "正在压缩图片并提交。首次运行模型可能需要下载和加载权重。";
         verdict.textContent = "Running";
         verdict.className = "verdict";
 
         try {
+          const [compressedA, compressedB] = await Promise.all([
+            compressImageFile(imageA.files[0]),
+            compressImageFile(imageB.files[0]),
+          ]);
+          const originalSize = imageA.files[0].size + imageB.files[0].size;
+          const compressedSize = compressedA.size + compressedB.size;
+
+          const form = new FormData();
+          form.append("config_id", configSelect.value);
+          form.append("image_a", compressedA);
+          form.append("image_b", compressedB);
+          form.append("threshold", threshold.value);
+
+          runHint.textContent = `已压缩上传：${(originalSize / 1024 / 1024).toFixed(2)} MB -> ${(compressedSize / 1024 / 1024).toFixed(2)} MB`;
           const response = await fetch(apiUrl("api/compare"), { method: "POST", body: form });
           const data = await readPayload(response);
           json.textContent = JSON.stringify(data, null, 2);
