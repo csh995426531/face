@@ -6,15 +6,15 @@ services:
     ports:
       - "8000:8000"
     environment:
-      FACE_MYSQL_HOST: "${FACE_MYSQL_HOST:-host.docker.internal}"
-      FACE_MYSQL_PORT: "${FACE_MYSQL_PORT:-3306}"
-      FACE_MYSQL_USER: "${FACE_MYSQL_USER:-face}"
-      FACE_MYSQL_PASSWORD: "${FACE_MYSQL_PASSWORD:-face}"
-      FACE_MYSQL_DATABASE: "${FACE_MYSQL_DATABASE:-face_service_eval}"
+      FACE_MYSQL_HOST: "${FACE_MYSQL_HOST:?FACE_MYSQL_HOST is required}"
+      FACE_MYSQL_PORT: "${FACE_MYSQL_PORT:?FACE_MYSQL_PORT is required}"
+      FACE_MYSQL_USER: "${FACE_MYSQL_USER:?FACE_MYSQL_USER is required}"
+      FACE_MYSQL_PASSWORD: "${FACE_MYSQL_PASSWORD:?FACE_MYSQL_PASSWORD is required}"
+      FACE_MYSQL_DATABASE: "${FACE_MYSQL_DATABASE:?FACE_MYSQL_DATABASE is required}"
       FACE_SERVICE_MODEL_CONFIG_IDS: "${FACE_SERVICE_MODEL_CONFIG_IDS:-buffalo_l,arcface_retinaface_cosine,arcface_retinaface_euclidean_l2,facenet512_retinaface_cosine,ghostfacenet_retinaface_cosine}"
-      FACE_WORKER_CREDENTIALS_JSON: '[{"worker_id":"worker-buffalo-l","worker_token":"${FACE_WORKER_BUFFALO_TOKEN:-change-me-buffalo}","allowed_model_config_ids":["buffalo_l"],"allowed_capabilities":["face_compare.buffalo_l"]},{"worker_id":"worker-arcface-cosine","worker_token":"${FACE_WORKER_ARCFACE_COSINE_TOKEN:-change-me-arcface-cosine}","allowed_model_config_ids":["arcface_retinaface_cosine"],"allowed_capabilities":["face_compare.arcface_retinaface_cosine"]},{"worker_id":"worker-arcface-euclidean-l2","worker_token":"${FACE_WORKER_ARCFACE_EUCLIDEAN_L2_TOKEN:-change-me-arcface-euclidean-l2}","allowed_model_config_ids":["arcface_retinaface_euclidean_l2"],"allowed_capabilities":["face_compare.arcface_retinaface_euclidean_l2"]},{"worker_id":"worker-facenet512","worker_token":"${FACE_WORKER_FACENET512_TOKEN:-change-me-facenet512}","allowed_model_config_ids":["facenet512_retinaface_cosine"],"allowed_capabilities":["face_compare.facenet512_retinaface_cosine"]},{"worker_id":"worker-ghostfacenet","worker_token":"${FACE_WORKER_GHOSTFACENET_TOKEN:-change-me-ghostfacenet}","allowed_model_config_ids":["ghostfacenet_retinaface_cosine"],"allowed_capabilities":["face_compare.ghostfacenet_retinaface_cosine"]}]'
-      FACE_API_ACCESS_KEY: "${FACE_API_ACCESS_KEY:-sampleaccesskey}"
-      FACE_API_SECRET_KEY: "${FACE_API_SECRET_KEY:-samplesecretkey}"
+      FACE_WORKER_CREDENTIALS_JSON: '[{"worker_id":"worker-buffalo-l","worker_token":"${FACE_WORKER_BUFFALO_TOKEN:?FACE_WORKER_BUFFALO_TOKEN is required}","allowed_model_config_ids":["buffalo_l"],"allowed_capabilities":["face_compare.buffalo_l"]},{"worker_id":"worker-arcface-cosine","worker_token":"${FACE_WORKER_ARCFACE_COSINE_TOKEN:?FACE_WORKER_ARCFACE_COSINE_TOKEN is required}","allowed_model_config_ids":["arcface_retinaface_cosine"],"allowed_capabilities":["face_compare.arcface_retinaface_cosine"]},{"worker_id":"worker-arcface-euclidean-l2","worker_token":"${FACE_WORKER_ARCFACE_EUCLIDEAN_L2_TOKEN:?FACE_WORKER_ARCFACE_EUCLIDEAN_L2_TOKEN is required}","allowed_model_config_ids":["arcface_retinaface_euclidean_l2"],"allowed_capabilities":["face_compare.arcface_retinaface_euclidean_l2"]},{"worker_id":"worker-facenet512","worker_token":"${FACE_WORKER_FACENET512_TOKEN:?FACE_WORKER_FACENET512_TOKEN is required}","allowed_model_config_ids":["facenet512_retinaface_cosine"],"allowed_capabilities":["face_compare.facenet512_retinaface_cosine"]},{"worker_id":"worker-ghostfacenet","worker_token":"${FACE_WORKER_GHOSTFACENET_TOKEN:?FACE_WORKER_GHOSTFACENET_TOKEN is required}","allowed_model_config_ids":["ghostfacenet_retinaface_cosine"],"allowed_capabilities":["face_compare.ghostfacenet_retinaface_cosine"]}]'
+      FACE_API_ACCESS_KEY: "${FACE_API_ACCESS_KEY:?FACE_API_ACCESS_KEY is required}"
+      FACE_API_SECRET_KEY: "${FACE_API_SECRET_KEY:?FACE_API_SECRET_KEY is required}"
       FACE_API_SOURCE_PRODUCT: "${FACE_API_SOURCE_PRODUCT:-internal_product_a}"
     volumes:
       - ./.data:/app/.data
@@ -30,7 +30,7 @@ services:
     environment:
       FACE_API_BASE_URL: http://api:8000
       FACE_WORKER_ID: worker-buffalo-l
-      FACE_WORKER_TOKEN: "${FACE_WORKER_BUFFALO_TOKEN:-change-me-buffalo}"
+      FACE_WORKER_TOKEN: "${FACE_WORKER_BUFFALO_TOKEN:?FACE_WORKER_BUFFALO_TOKEN is required}"
       FACE_WORKER_MODEL_CONFIG_ID: buffalo_l
       FACE_WORKER_CAPABILITY: face_compare.buffalo_l
       FACE_WORKER_POLL_SECONDS: "${FACE_WORKER_POLL_SECONDS:-2}"
@@ -48,7 +48,7 @@ services:
     environment:
       FACE_API_BASE_URL: http://api:8000
       FACE_WORKER_ID: worker-arcface-cosine
-      FACE_WORKER_TOKEN: "${FACE_WORKER_ARCFACE_COSINE_TOKEN:-change-me-arcface-cosine}"
+      FACE_WORKER_TOKEN: "${FACE_WORKER_ARCFACE_COSINE_TOKEN:?FACE_WORKER_ARCFACE_COSINE_TOKEN is required}"
       FACE_WORKER_MODEL_CONFIG_ID: arcface_retinaface_cosine
       FACE_WORKER_CAPABILITY: face_compare.arcface_retinaface_cosine
       FACE_WORKER_POLL_SECONDS: "${FACE_WORKER_POLL_SECONDS:-2}"
@@ -66,7 +66,7 @@ services:
     environment:
       FACE_API_BASE_URL: http://api:8000
       FACE_WORKER_ID: worker-arcface-euclidean-l2
-      FACE_WORKER_TOKEN: "${FACE_WORKER_ARCFACE_EUCLIDEAN_L2_TOKEN:-change-me-arcface-euclidean-l2}"
+      FACE_WORKER_TOKEN: "${FACE_WORKER_ARCFACE_EUCLIDEAN_L2_TOKEN:?FACE_WORKER_ARCFACE_EUCLIDEAN_L2_TOKEN is required}"
       FACE_WORKER_MODEL_CONFIG_ID: arcface_retinaface_euclidean_l2
       FACE_WORKER_CAPABILITY: face_compare.arcface_retinaface_euclidean_l2
       FACE_WORKER_POLL_SECONDS: "${FACE_WORKER_POLL_SECONDS:-2}"
@@ -84,7 +84,7 @@ services:
     environment:
       FACE_API_BASE_URL: http://api:8000
       FACE_WORKER_ID: worker-facenet512
-      FACE_WORKER_TOKEN: "${FACE_WORKER_FACENET512_TOKEN:-change-me-facenet512}"
+      FACE_WORKER_TOKEN: "${FACE_WORKER_FACENET512_TOKEN:?FACE_WORKER_FACENET512_TOKEN is required}"
       FACE_WORKER_MODEL_CONFIG_ID: facenet512_retinaface_cosine
       FACE_WORKER_CAPABILITY: face_compare.facenet512_retinaface_cosine
       FACE_WORKER_POLL_SECONDS: "${FACE_WORKER_POLL_SECONDS:-2}"
@@ -102,7 +102,7 @@ services:
     environment:
       FACE_API_BASE_URL: http://api:8000
       FACE_WORKER_ID: worker-ghostfacenet
-      FACE_WORKER_TOKEN: "${FACE_WORKER_GHOSTFACENET_TOKEN:-change-me-ghostfacenet}"
+      FACE_WORKER_TOKEN: "${FACE_WORKER_GHOSTFACENET_TOKEN:?FACE_WORKER_GHOSTFACENET_TOKEN is required}"
       FACE_WORKER_MODEL_CONFIG_ID: ghostfacenet_retinaface_cosine
       FACE_WORKER_CAPABILITY: face_compare.ghostfacenet_retinaface_cosine
       FACE_WORKER_POLL_SECONDS: "${FACE_WORKER_POLL_SECONDS:-2}"

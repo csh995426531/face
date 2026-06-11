@@ -822,6 +822,16 @@
         return Array.isArray(range) ? `${range[0]} - ${range[1]}` : "-";
       }
 
+      function appendTextCell(row, value) {
+        const cell = document.createElement("td");
+        cell.textContent = value ?? "-";
+        row.appendChild(cell);
+      }
+
+      function appendOption(select, value, label) {
+        select.appendChild(new Option(label, value));
+      }
+
       function renderEval(job) {
         evalJson.textContent = JSON.stringify(job, null, 2);
         evalStatus.textContent = `${job.status} · ${job.job_id ? job.job_id.slice(0, 8) : ""}`;
@@ -831,32 +841,34 @@
         evalVerdict.textContent = job.status === "done" ? "完成" : job.status === "error" ? "Error" : "Running";
 
         const progress = job.progress || {};
-        evalProgress.innerHTML = Object.entries(progress)
-          .map(([model, item]) => `<div>${model}: ${item.status} · ${item.done}/${item.total}</div>`)
-          .join("");
+        evalProgress.replaceChildren();
+        Object.entries(progress).forEach(([model, item]) => {
+          const line = document.createElement("div");
+          line.textContent = `${model}: ${item.status} · ${item.done}/${item.total}`;
+          evalProgress.appendChild(line);
+        });
 
         const summaries = [...(job.summaries || [])].sort((a, b) => {
           if ((b.auc ?? -1) !== (a.auc ?? -1)) return (b.auc ?? -1) - (a.auc ?? -1);
           if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
           return a.far - b.far;
         });
-        evalTableBody.innerHTML = summaries
-          .map((row) => `
-            <tr>
-              <td>${row.label || row.config_id}</td>
-              <td>${row.best_threshold ?? "-"}</td>
-              <td>${row.accuracy ?? "-"}</td>
-              <td>${row.far ?? "-"}</td>
-              <td>${row.frr ?? "-"}</td>
-              <td>${row.zero_far_frr ?? "-"} @ ${row.zero_far_threshold ?? "-"}</td>
-              <td>${row.auc ?? "-"}</td>
-              <td>${row.ok ?? 0}/${row.failed ?? 0}</td>
-              <td>${row.avg_latency_ms ?? "-"}</td>
-              <td>${rangeText(row.positive_score_range)}</td>
-              <td>${rangeText(row.negative_score_range)}</td>
-            </tr>
-          `)
-          .join("");
+        evalTableBody.replaceChildren();
+        summaries.forEach((item) => {
+          const row = document.createElement("tr");
+          appendTextCell(row, item.label || item.config_id);
+          appendTextCell(row, item.best_threshold);
+          appendTextCell(row, item.accuracy);
+          appendTextCell(row, item.far);
+          appendTextCell(row, item.frr);
+          appendTextCell(row, `${item.zero_far_frr ?? "-"} @ ${item.zero_far_threshold ?? "-"}`);
+          appendTextCell(row, item.auc);
+          appendTextCell(row, `${item.ok ?? 0}/${item.failed ?? 0}`);
+          appendTextCell(row, item.avg_latency_ms);
+          appendTextCell(row, rangeText(item.positive_score_range));
+          appendTextCell(row, rangeText(item.negative_score_range));
+          evalTableBody.appendChild(row);
+        });
       }
 
       async function pollEvalJob(jobId) {
@@ -899,9 +911,10 @@
         const data = await readPayload(response);
         const jobs = data.jobs || [];
         const currentJobId = evalJobHistory.value;
-        evalJobHistory.innerHTML = jobs
-          .map((job) => `<option value="${job.job_id}">${job.status} · ${job.job_id.slice(0, 8)} · pairs ${job.pairs ?? "-"}</option>`)
-          .join("");
+        evalJobHistory.replaceChildren();
+        jobs.forEach((job) => {
+          appendOption(evalJobHistory, job.job_id, `${job.status} · ${job.job_id.slice(0, 8)} · pairs ${job.pairs ?? "-"}`);
+        });
         if (currentJobId && jobs.some((job) => job.job_id === currentJobId)) {
           evalJobHistory.value = currentJobId;
         } else if (jobs.length) {
@@ -924,9 +937,10 @@
       async function loadConfigs() {
         const response = await fetch(apiUrl("api/configs"));
         configs = await readPayload(response);
-        configSelect.innerHTML = configs
-          .map((config) => `<option value="${config.id}">${config.rank} · ${config.label}</option>`)
-          .join("");
+        configSelect.replaceChildren();
+        configs.forEach((config) => {
+          appendOption(configSelect, config.id, `${config.rank} · ${config.label}`);
+        });
         configStatus.textContent = `${configs.length} configs ready`;
         updateConfigMeta();
       }
@@ -949,16 +963,17 @@
         datasetImages = data.images;
         if (datasetImages.length === 0) {
           datasetStatus.textContent = `No images under ${data.dataset_root}`;
-          serverImageA.innerHTML = "";
-          serverImageB.innerHTML = "";
+          serverImageA.replaceChildren();
+          serverImageB.replaceChildren();
           return;
         }
 
-        const options = datasetImages
-          .map((item) => `<option value="${item.path}">${datasetLabel(item)}</option>`)
-          .join("");
-        serverImageA.innerHTML = options;
-        serverImageB.innerHTML = options;
+        serverImageA.replaceChildren();
+        serverImageB.replaceChildren();
+        datasetImages.forEach((item) => {
+          appendOption(serverImageA, item.path, datasetLabel(item));
+          appendOption(serverImageB, item.path, datasetLabel(item));
+        });
 
         const defaultA = datasetImages.find((item) => item.name.toLowerCase().startsWith("id_1")) || datasetImages[0];
         const defaultB = datasetImages.find((item) => item.name.toLowerCase().startsWith("selfie_1")) || datasetImages[1] || datasetImages[0];

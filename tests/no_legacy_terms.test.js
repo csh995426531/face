@@ -14,7 +14,7 @@ function walk(dir) {
     const fullPath = path.join(dir, entry.name);
     const relative = path.relative(root, fullPath);
     if (entry.isDirectory()) {
-      if ([".git", "__pycache__", ".pytest_cache"].includes(entry.name)) continue;
+      if ([".git", ".venv", "venv", "__pycache__", ".pytest_cache"].includes(entry.name)) continue;
       files.push(...walk(fullPath));
     } else if (!allowed.has(relative)) {
       files.push(relative);

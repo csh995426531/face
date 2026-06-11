@@ -3,7 +3,6 @@ import uuid
 from typing import Any
 
 from app.repositories.evaluation import (
-    init_evaluation_db,
     list_evaluation_jobs as repo_list_evaluation_jobs,
     load_evaluation_job,
     save_evaluation_job,
@@ -12,9 +11,6 @@ from app.repositories.service import get_job, get_job_results, get_job_tasks
 from app.core.face_compare import MODEL_CONFIGS
 from app.services.service_jobs import JOB_TYPE_WEB_EVALUATION, create_local_service_job
 from app.services.web_image import list_dataset_images, resolve_dataset_path
-
-init_evaluation_db()
-
 
 def enqueue_evaluate_job(positive_limit_per_group: int, negative_limit_per_group: int):
     job_id = uuid.uuid4().hex

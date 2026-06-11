@@ -11,13 +11,17 @@ from app.core.face_compare import run_compare_paths
 def parse_args():
     parser = argparse.ArgumentParser(description="Run one face comparison model worker.")
     parser.add_argument("--api-base-url", default=os.environ.get("FACE_API_BASE_URL", "http://127.0.0.1:8000"))
-    parser.add_argument("--worker-id", default=os.environ.get("FACE_WORKER_ID", "dev-worker-buffalo-l"))
-    parser.add_argument("--worker-token", default=os.environ.get("FACE_WORKER_TOKEN", "dev-worker-token-change-me-32-bytes"))
+    parser.add_argument("--worker-id", default=os.environ.get("FACE_WORKER_ID"))
+    parser.add_argument("--worker-token", default=os.environ.get("FACE_WORKER_TOKEN"))
     parser.add_argument("--model-config-id", default=os.environ.get("FACE_WORKER_MODEL_CONFIG_ID", "buffalo_l"))
     parser.add_argument("--capability", default=os.environ.get("FACE_WORKER_CAPABILITY"))
     parser.add_argument("--poll-seconds", type=float, default=float(os.environ.get("FACE_WORKER_POLL_SECONDS", "2")))
     parser.add_argument("--limit", type=int, default=int(os.environ.get("FACE_WORKER_LEASE_LIMIT", "1")))
     args = parser.parse_args()
+    if not args.worker_id:
+        parser.error("--worker-id or FACE_WORKER_ID is required")
+    if not args.worker_token:
+        parser.error("--worker-token or FACE_WORKER_TOKEN is required")
     if not args.capability:
         args.capability = f"face_compare.{args.model_config_id}"
     return args

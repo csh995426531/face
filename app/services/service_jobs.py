@@ -277,18 +277,20 @@ def maybe_json(raw: str | None):
         return raw
 
 
-def asset_payload(asset: dict[str, Any]):
-    return {
+def asset_payload(asset: dict[str, Any], include_url=False):
+    payload = {
         "assetId": asset["asset_id"],
         "fieldName": asset["field_name"],
         "position": asset["position"],
         "uri": asset["uri"],
-        "url": str(BASE_DIR / asset["uri"]),
         "sha256": asset["sha256"],
         "mime": asset["mime"],
         "sizeBytes": asset["size_bytes"],
         "originalFilename": asset.get("original_filename"),
     }
+    if include_url:
+        payload["url"] = str(BASE_DIR / asset["uri"])
+    return payload
 
 
 def generic_task_payload(task_id: str):
@@ -353,7 +355,7 @@ def lease_generic_worker_tasks(capability: str, worker_id: str, limit: int):
     lease_until = now_ts() + 300
     leased = []
     for worker_task, job, assets in repo_lease_service_worker_tasks(capability, worker_id, limit, lease_until):
-        asset_list = [asset_payload(asset) for asset in assets]
+        asset_list = [asset_payload(asset, include_url=True) for asset in assets]
         payload = {
             "workerTaskId": worker_task["worker_task_id"],
             "taskId": worker_task["task_id"],
@@ -470,6 +472,8 @@ def complete_generic_worker_task(worker_task_id: str, worker_id: str, payload: d
             "created_at": now_ts(),
         },
     )
+    if not saved:
+        json_error("WORKER_AUTH_FAILED", "worker does not currently hold this task lease", 403)
     trigger_comparisons(task["task_id"])
     return saved
 
@@ -694,10 +698,12 @@ def lease_worker_tasks(model_config_id: str, worker_id: str, limit: int):
     return [task_response(task, job) for task, job in lease_tasks(model_config_id, worker_id, limit, lease_until)]
 
 
-def complete_worker_task(task_id: str, payload: dict[str, Any]):
+def complete_worker_task(task_id: str, worker_id: str, payload: dict[str, Any]):
     task = get_task(task_id)
     if not task:
         json_error("PARAMETER_ERROR", f"unknown taskId: {task_id}", 404)
+    if task["status"] != "running" or task.get("worker_id") != worker_id or not task.get("lease_until") or float(task["lease_until"]) < now_ts():
+        json_error("WORKER_AUTH_FAILED", "worker does not currently hold this task lease", 403)
     status = str(payload.get("status", "")).strip()
     if status not in {"completed", "failed"}:
         json_error("PARAMETER_ERROR", "status must be completed or failed")
@@ -706,14 +712,17 @@ def complete_worker_task(task_id: str, payload: dict[str, Any]):
     if status == "failed":
         error_code = str(payload.get("errorCode") or "MODEL_RUNTIME_ERROR")
         error_message = str(payload.get("errorMessage") or "model task failed")
-        repo_fail_task(task_id, error_message, error_code)
+        failed = repo_fail_task(task_id, error_message, error_code, worker_id=worker_id)
+        if not failed:
+            json_error("WORKER_AUTH_FAILED", "worker does not currently hold this task lease", 403)
         return task, None
 
     decision_status = str(payload.get("decisionStatus") or ("same_person" if payload.get("samePerson") is True else "different_person" if payload.get("samePerson") is False else "uncertain"))
-    repo_complete_task_with_result(
+    saved = repo_complete_task_with_result(
         task_id,
         {
             "result_id": next_service_id("fr"),
+            "worker_id": worker_id,
             "score": payload.get("score"),
             "distance": payload.get("distance"),
             "score_direction": payload.get("scoreDirection"),
@@ -733,6 +742,8 @@ def complete_worker_task(task_id: str, payload: dict[str, Any]):
             "created_at": now_ts(),
         },
     )
+    if not saved:
+        json_error("WORKER_AUTH_FAILED", "worker does not currently hold this task lease", 403)
     updated = get_task(task_id)
     return task, updated
 

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Body, File, Form, Header, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from app.services.service_auth import generate_token, require_access_token, require_worker
-from app.db.mysql import init_service_db, utc_iso
+from app.db.mysql import utc_iso
 from app.services.errors import json_error
 from app.services.service_jobs import (
     complete_generic_worker_task,
@@ -26,7 +26,6 @@ from app.services.service_jobs import (
 from app.services.service_storage import generic_asset_meta
 
 router = APIRouter()
-init_service_db()
 
 
 def api_response(code="SUCCESS", message="OK", data=None, http_status=200):
@@ -45,6 +44,14 @@ def api_response(code="SUCCESS", message="OK", data=None, http_status=200):
 
 def fail_api(code: str, message: str, http_status=400):
     return api_response(code=code, message=message, data=None, http_status=http_status)
+
+
+def bounded_int(payload: dict[str, Any], field_name: str, default: int, minimum: int, maximum: int):
+    try:
+        value = int(payload.get(field_name, default))
+    except (TypeError, ValueError):
+        json_error("PARAMETER_ERROR", f"{field_name} must be integer")
+    return min(max(value, minimum), maximum)
 
 
 @router.post("/openapi/auth/ticket/v1/generate-token")
@@ -164,7 +171,8 @@ def get_generic_task(task_id: str, x_access_token: str | None = Header(default=N
 
 
 @router.get("/internal/face-recognition/jobs/{job_id}")
-def get_service_job(job_id: str):
+def get_service_job(job_id: str, x_access_token: str | None = Header(default=None)):
+    require_access_token(x_access_token)
     payload = service_job_payload(job_id)
     if not payload:
         json_error("PARAMETER_ERROR", f"unknown jobId: {job_id}", 404)
@@ -182,7 +190,7 @@ def submit_vendor_result(payload: dict[str, Any] = Body(...), x_access_token: st
 def lease_model_tasks(request: Request, payload: dict[str, Any] = Body(...)):
     model_config_id = str(payload.get("modelConfigId", "")).strip()
     worker_id = str(payload.get("workerId", "")).strip() or request.headers.get("X-WORKER-ID")
-    limit = min(max(int(payload.get("limit", 1)), 1), 20)
+    limit = bounded_int(payload, "limit", 1, 1, 20)
     if not model_config_id:
         json_error("PARAMETER_ERROR", "modelConfigId is required")
     worker = require_worker(request, model_config_id)
@@ -195,7 +203,7 @@ def lease_model_tasks(request: Request, payload: dict[str, Any] = Body(...)):
 def lease_service_tasks(request: Request, payload: dict[str, Any] = Body(...)):
     capability = str(payload.get("capability", "")).strip()
     worker_id = str(payload.get("workerId", "")).strip() or request.headers.get("X-WORKER-ID")
-    limit = min(max(int(payload.get("limit", 1)), 1), 20)
+    limit = bounded_int(payload, "limit", 1, 1, 20)
     if not capability:
         json_error("PARAMETER_ERROR", "capability is required")
     worker = require_worker(request, capability=capability)
@@ -220,9 +228,9 @@ def submit_model_task_result(task_id: str, request: Request, payload: dict[str, 
     task = get_compare_task(task_id)
     worker = require_worker(request, task["model_config_id"])
     worker_id = str(payload.get("workerId", "")).strip() or request.headers.get("X-WORKER-ID")
-    if task["worker_id"] and task["worker_id"] != worker_id:
-        json_error("WORKER_AUTH_FAILED", "worker does not hold this task lease", 403)
-    complete_worker_task(task_id, payload)
+    if worker_id != worker["worker_id"]:
+        json_error("WORKER_AUTH_FAILED", "workerId does not match auth header", 401)
+    complete_worker_task(task_id, worker["worker_id"], payload)
     job = service_job_payload(task["job_id"])
     return {"code": 0, "message": "accepted", "taskId": task_id, "jobStatus": job["status"], "workerId": worker["worker_id"]}
 
@@ -233,7 +241,7 @@ def renew_model_task_lease(task_id: str, request: Request, payload: dict[str, An
     worker = require_worker(request, task["model_config_id"])
     if task["worker_id"] != worker["worker_id"]:
         json_error("WORKER_AUTH_FAILED", "worker does not hold this task lease", 403)
-    lease_seconds = min(max(int(payload.get("leaseSeconds", 300)), 1), 600)
+    lease_seconds = bounded_int(payload, "leaseSeconds", 300, 1, 600)
     _task, lease_until = renew_worker_task(task_id, lease_seconds)
     return {"taskId": task_id, "leaseUntil": utc_iso(lease_until)}
 

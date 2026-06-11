@@ -33,6 +33,15 @@ def get_worker_credential(worker_id: str):
     return row_to_dict(row)
 
 
+def has_active_worker_lease(task: dict | None, worker_id: str):
+    if not task or task.get("status") != "running" or task.get("worker_id") != worker_id or not task.get("lease_until"):
+        return False
+    try:
+        return float(task["lease_until"]) >= now_ts()
+    except (TypeError, ValueError):
+        return False
+
+
 def get_job(job_id: str):
     with db_connect() as conn:
         return load_compare_job(conn, job_id)
@@ -377,8 +386,8 @@ def get_service_worker_task(worker_task_id: str):
 def complete_service_worker_task(worker_task_id: str, result: dict):
     with db_connect() as conn:
         conn.execute("START TRANSACTION")
-        task = row_to_dict(conn.execute("SELECT * FROM service_worker_tasks WHERE worker_task_id = %s", (worker_task_id,)).fetchone())
-        if not task:
+        task = row_to_dict(conn.execute("SELECT * FROM service_worker_tasks WHERE worker_task_id = %s FOR UPDATE", (worker_task_id,)).fetchone())
+        if not has_active_worker_lease(task, result["worker_id"]):
             return None
         conn.execute(
             """
@@ -542,9 +551,16 @@ def mark_task_running(task_id: str):
 
 def complete_task_with_result(task_id: str, result: dict):
     with db_connect() as conn:
-        task = row_to_dict(conn.execute("SELECT * FROM compare_model_tasks WHERE task_id = %s", (task_id,)).fetchone())
+        conn.execute("START TRANSACTION")
+        worker_id = result.get("worker_id")
+        select_sql = "SELECT * FROM compare_model_tasks WHERE task_id = %s"
+        if worker_id:
+            select_sql += " FOR UPDATE"
+        task = row_to_dict(conn.execute(select_sql, (task_id,)).fetchone())
         if not task:
             return
+        if worker_id and not has_active_worker_lease(task, worker_id):
+            return None
         existing = conn.execute("SELECT task_id FROM compare_model_results WHERE task_id = %s", (task_id,)).fetchone()
         if not existing:
             conn.execute(
@@ -585,19 +601,27 @@ def complete_task_with_result(task_id: str, result: dict):
             (now_ts(), task_id),
         )
         aggregate_job_status(conn, task["job_id"])
+        return task
 
 
-def fail_task(task_id: str, error_message: str, error_code="MODEL_RUNTIME_ERROR"):
+def fail_task(task_id: str, error_message: str, error_code="MODEL_RUNTIME_ERROR", worker_id: str | None = None):
     with db_connect() as conn:
-        task = row_to_dict(conn.execute("SELECT job_id FROM compare_model_tasks WHERE task_id = %s", (task_id,)).fetchone())
+        conn.execute("START TRANSACTION")
+        select_sql = "SELECT * FROM compare_model_tasks WHERE task_id = %s"
+        if worker_id:
+            select_sql += " FOR UPDATE"
+        task = row_to_dict(conn.execute(select_sql, (task_id,)).fetchone())
         if not task:
             return
+        if worker_id and not has_active_worker_lease(task, worker_id):
+            return None
         now = now_ts()
         conn.execute(
             "UPDATE compare_model_tasks SET status = 'failed', error_code = %s, error_message = %s, finished_at = %s WHERE task_id = %s",
             (error_code, error_message, now, task_id),
         )
         aggregate_job_status(conn, task["job_id"])
+        return task
 
 
 def save_vendor_result(job_id: str, payload: dict, vendor_result_id: str):

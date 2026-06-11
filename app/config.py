@@ -39,16 +39,18 @@ DEFAULT_SERVICE_CAPABILITIES = {
     "blacklist": os.environ.get("FACE_SERVICE_BLACKLIST_CAPABILITY", "blacklist.engineering_v1"),
 }
 
-ACCESS_CLIENTS = {
-    os.environ.get("FACE_API_ACCESS_KEY", "sampleaccesskey"): {
-        "secret_key": os.environ.get("FACE_API_SECRET_KEY", "samplesecretkey"),
+ACCESS_CLIENTS = {}
+ACCESS_KEY = os.environ.get("FACE_API_ACCESS_KEY")
+ACCESS_SECRET = os.environ.get("FACE_API_SECRET_KEY")
+if ACCESS_KEY and ACCESS_SECRET:
+    ACCESS_CLIENTS[ACCESS_KEY] = {
+        "secret_key": ACCESS_SECRET,
         "source_product": os.environ.get("FACE_API_SOURCE_PRODUCT", "internal_product_a"),
         "status": os.environ.get("FACE_API_ACCOUNT_STATUS", "enabled"),
     }
-}
 
-DEV_WORKER_ID = os.environ.get("FACE_WORKER_ID", "dev-worker-buffalo-l")
-DEV_WORKER_TOKEN = os.environ.get("FACE_WORKER_TOKEN", "dev-worker-token-change-me-32-bytes")
+DEV_WORKER_ID = os.environ.get("FACE_WORKER_ID")
+DEV_WORKER_TOKEN = os.environ.get("FACE_WORKER_TOKEN")
 
 
 def load_worker_credentials():
@@ -62,15 +64,17 @@ def load_worker_credentials():
                 [f"face_compare.{value}" for value in credential.get("allowed_model_config_ids", [])],
             )
         return credentials
-    return [
-        {
-            "worker_id": DEV_WORKER_ID,
-            "worker_name": DEV_WORKER_ID,
-            "worker_token": DEV_WORKER_TOKEN,
-            "allowed_model_config_ids": SERVICE_MODEL_CONFIG_IDS,
-            "allowed_capabilities": [f"face_compare.{value}" for value in SERVICE_MODEL_CONFIG_IDS],
-        }
-    ]
+    if DEV_WORKER_ID and DEV_WORKER_TOKEN:
+        return [
+            {
+                "worker_id": DEV_WORKER_ID,
+                "worker_name": DEV_WORKER_ID,
+                "worker_token": DEV_WORKER_TOKEN,
+                "allowed_model_config_ids": SERVICE_MODEL_CONFIG_IDS,
+                "allowed_capabilities": [f"face_compare.{value}" for value in SERVICE_MODEL_CONFIG_IDS],
+            }
+        ]
+    return []
 
 
 WORKER_CREDENTIALS = load_worker_credentials()
