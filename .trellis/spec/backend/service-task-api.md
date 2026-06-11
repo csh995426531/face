@@ -25,24 +25,26 @@
 
 ### 3. Contracts
 
-- `POST /api/tasks` requires `serviceType` and `requestId`; `sourceProduct` may come from token or form.
+- `POST /api/tasks` requires `serviceType` and `requestId`; authenticated caller identity comes from token-derived `api_id`, and request-provided `sourceProduct` is ignored.
+- `GET /api/tasks/{taskId}` and `GET /internal/face-recognition/jobs/{jobId}` must return data only when the stored `api_id` matches the caller token; cross-caller reads must respond as not found.
 - Supported `serviceType` values are `ocr`, `face_compare`, `tamper_detect`, `liveness`, `aigc_detect`, and `blacklist`.
 - `payloadJson` and `officialResultJson` are optional JSON strings and must remain raw/auditable when stored.
 - Uploaded files may use unknown field names; persist each asset with field name, per-field upload position, URI, sha256, MIME, size, and original filename.
-- Idempotency key is `sourceProduct + requestId + serviceType`; replays with the same payload/assets return the existing task, while different payload/assets are conflicts.
-- Official results may arrive inline on task creation or later via `POST /api/official-results`; if the task does not exist, store a pending result keyed by `sourceProduct + requestId + serviceType`.
+- Idempotency key is `api_id + requestId + serviceType`; replays with the same payload/assets return the existing task, while different payload/assets are conflicts.
+- Official results may arrive inline on task creation or later via `POST /api/official-results`; if the task does not exist, store a pending result keyed by `api_id + requestId + serviceType`.
 - Workers lease by `capability`, for example `face_compare.buffalo_l`; worker credentials and Docker env must allow the same capability string.
 - Both generic and legacy worker result routes must validate that the authenticated header worker matches any payload `workerId`, that the task is `running`, and that the same worker currently holds an unexpired lease.
 - Worker result and worker failure writes must re-check the active lease inside the repository transaction before inserting results or changing task status.
 
 ### 4. Validation & Error Matrix
 
-- Missing `serviceType`, `requestId`, or token-derived `sourceProduct` -> `PARAMETER_ERROR`.
+- Missing `serviceType`, `requestId`, or token-derived `api_id` -> `PARAMETER_ERROR`.
 - Unsupported `serviceType` -> `PARAMETER_ERROR`.
 - Invalid `payloadJson`, `officialResultJson`, `officialResult`, or `normalizedResult` JSON -> `PARAMETER_ERROR`.
 - Same idempotency key with different payload/assets -> `PARAMETER_ERROR` with HTTP 409.
 - Same idempotency key with different official result -> `PARAMETER_ERROR` with HTTP 409.
 - Worker credential missing, token mismatch, or disallowed capability -> worker auth error with HTTP 401/403.
+- Access token tied to a disabled or deleted `api_client` -> `INVALID_TOKEN` with HTTP 401.
 - Worker result submitted by a worker that does not currently hold an unexpired lease -> `WORKER_AUTH_FAILED` with HTTP 403.
 - Worker result payload `workerId` differs from authenticated `X-WORKER-ID` credential -> `WORKER_AUTH_FAILED` with HTTP 401.
 - Unknown asset fields are accepted unless they violate size or safety limits.
@@ -53,7 +55,7 @@
 - Good: official result arrives before task creation; `pending_official_results` stores it, and task creation attaches it automatically.
 - Base: non-face service task is accepted and routed to its default capability; comparison becomes `pending_adapter` once both official and worker results exist.
 - Bad: a Docker worker sets `FACE_WORKER_CAPABILITY=face_compare.arcface_retinaface_cosine` but API credentials omit the same `allowed_capabilities`; lease must be forbidden.
-- Bad: an idempotent replay includes new files for the same `sourceProduct + requestId + serviceType`; the API must reject instead of overwriting.
+- Bad: an idempotent replay includes new files for the same `api_id + requestId + serviceType`; the API must reject instead of overwriting.
 - Bad: an authenticated legacy model worker submits `/internal/model-tasks/{taskId}/result` for a task leased to another worker; result submission must be forbidden.
 
 ### 6. Tests Required
@@ -64,6 +66,8 @@
 - Contract tests assert worker leasing routes by `capability` and Docker credentials explicitly include matching `allowed_capabilities`.
 - Contract tests assert official pending attach paths and `pending_adapter` comparison behavior are present.
 - Route/unit tests assert both generic and legacy worker result paths reject mismatched worker IDs and tasks without an active lease.
+- Route/unit tests assert task/job read endpoints reject valid tokens from another `api_id`.
+- Route/unit tests assert disabling an `api_client` invalidates previously issued access tokens.
 - Repository tests assert worker result and failure writes do not proceed after a lease was lost between service validation and the DB write.
 - Python compile check must pass for all backend modules.
 - `docker compose config` must render without empty critical MySQL env defaults.

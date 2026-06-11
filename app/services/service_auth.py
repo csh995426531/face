@@ -4,14 +4,13 @@ import json
 
 from fastapi import HTTPException, Request
 
-from app.config import ACCESS_CLIENTS
 from app.db.mysql import now_ts, token_hash
 from app.services.errors import json_error
-from app.repositories.service import create_access_token, get_access_token, get_worker_credential
+from app.repositories.service import create_access_token, get_access_token, get_api_client, get_worker_credential
 
 
 def get_client(access_key: str):
-    client = ACCESS_CLIENTS.get(access_key)
+    client = get_api_client(access_key)
     if not client or client.get("status") != "enabled":
         return None
     return client
@@ -42,7 +41,7 @@ def generate_token(access_key: str, timestamp: str, signature: str, period_raw):
 
     token = f"access_token_{uuid.uuid4().hex}"
     expires_at = now_ts() + period_second
-    create_access_token(token_hash(token), access_key, client["source_product"], expires_at)
+    create_access_token(token_hash(token), access_key, client["api_id"], expires_at)
     return {"token": token, "expiredTime": int(expires_at * 1000)}, None, None
 
 
@@ -50,7 +49,7 @@ def require_access_token(x_access_token: str | None):
     if not x_access_token:
         raise HTTPException(status_code=401, detail={"code": "INVALID_TOKEN", "message": "token missing"})
     row = get_access_token(token_hash(x_access_token))
-    if not row or float(row["expires_at"]) < now_ts():
+    if not row or float(row["expires_at"]) < now_ts() or row.get("client_status") != "enabled":
         raise HTTPException(status_code=401, detail={"code": "INVALID_TOKEN", "message": "token invalid or expired"})
     return row
 

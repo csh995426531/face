@@ -251,11 +251,11 @@ class RepositoryLeaseContractTest(unittest.TestCase):
 
 
 class ServicePayloadContractTest(unittest.TestCase):
-    def test_external_generic_task_payload_does_not_expose_local_asset_path(self):
+    def test_external_generic_task_payload_uses_api_id_and_does_not_expose_local_asset_path(self):
         job = {
             "task_id": "sj_test",
             "service_type": "face_compare",
-            "source_product": "internal_product_a",
+            "api_id": "api_test",
             "request_id": "req-1",
             "status": "queued",
             "raw_payload_json": None,
@@ -285,6 +285,8 @@ class ServicePayloadContractTest(unittest.TestCase):
 
         payload = jobs.generic_task_payload("sj_test")
 
+        self.assertEqual(payload["apiId"], "api_test")
+        self.assertNotIn("sourceProduct", payload)
         self.assertNotIn("url", payload["assets"][0])
         self.assertEqual(payload["assets"][0]["uri"], asset["uri"])
 

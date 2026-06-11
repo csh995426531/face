@@ -100,15 +100,15 @@ def parse_json_text(raw_value: str | None, field_name: str):
 def create_generic_service_task(
     *,
     service_type: str,
-    source_product: str,
+    api_id: str,
     request_id: str,
     raw_payload_json: str | None,
     assets: list[dict],
     official_result_json: str | None = None,
 ):
     validate_service_type(service_type)
-    if not source_product:
-        json_error("PARAMETER_ERROR", "sourceProduct is required")
+    if not api_id:
+        json_error("PARAMETER_ERROR", "apiId is required")
     if not request_id:
         json_error("PARAMETER_ERROR", "requestId is required")
     parse_json_text(raw_payload_json, "payloadJson")
@@ -117,16 +117,16 @@ def create_generic_service_task(
     payload_hash = service_payload_hash(raw_payload_json)
     assets_hash = service_assets_hash(normalized_assets)
     if official_result_json:
-        pending = get_pending_official_result(source_product, request_id, service_type)
+        pending = get_pending_official_result(api_id, request_id, service_type)
         if pending and pending["result_hash"] != sha256_text(official_result_json):
             json_error("PARAMETER_ERROR", "inline official result conflicts with pending official result", 409)
-    existing = get_service_job_by_request(source_product, request_id, service_type)
+    existing = get_service_job_by_request(api_id, request_id, service_type)
     if existing:
         if existing["payload_hash"] != payload_hash or existing["assets_hash"] != assets_hash:
-            json_error("PARAMETER_ERROR", "same sourceProduct + requestId + serviceType submitted with different payload or assets", 409)
+            json_error("PARAMETER_ERROR", "same apiId + requestId + serviceType submitted with different payload or assets", 409)
         if official_result_json:
             submit_official_result_record(
-                source_product=source_product,
+                api_id=api_id,
                 request_id=request_id,
                 service_type=service_type,
                 official_result=official_result_json,
@@ -153,7 +153,7 @@ def create_generic_service_task(
     job = {
         "task_id": task_id,
         "service_type": service_type,
-        "source_product": source_product,
+        "api_id": api_id,
         "request_id": request_id,
         "status": "queued",
         "raw_payload_json": raw_payload_json,
@@ -171,7 +171,7 @@ def create_generic_service_task(
 
     if official_result_json:
         submit_official_result_record(
-            source_product=source_product,
+            api_id=api_id,
             request_id=request_id,
             service_type=service_type,
             official_result=official_result_json,
@@ -187,11 +187,11 @@ def raw_result_text(value: Any):
     return canonical_json(value if value is not None else {})
 
 
-def build_official_result(source_product: str, request_id: str, service_type: str, raw_result_json: str, **metadata):
+def build_official_result(api_id: str, request_id: str, service_type: str, raw_result_json: str, **metadata):
     return {
         "official_result_id": next_service_id("or"),
         "pending_id": next_service_id("por"),
-        "source_product": source_product,
+        "api_id": api_id,
         "request_id": request_id,
         "service_type": service_type,
         "official_status": metadata.get("official_status"),
@@ -207,14 +207,14 @@ def attach_pending_official_result(task_id: str):
     job = get_service_job(task_id)
     if not job:
         return None
-    pending = get_pending_official_result(job["source_product"], job["request_id"], job["service_type"])
+    pending = get_pending_official_result(job["api_id"], job["request_id"], job["service_type"])
     if not pending:
         return None
     attached = insert_official_result(
         {
             "official_result_id": next_service_id("or"),
             "task_id": task_id,
-            "source_product": pending["source_product"],
+            "api_id": pending["api_id"],
             "request_id": pending["request_id"],
             "service_type": pending["service_type"],
             "official_status": pending.get("official_status"),
@@ -234,7 +234,7 @@ def attach_pending_official_result(task_id: str):
 
 def submit_official_result_record(
     *,
-    source_product: str,
+    api_id: str,
     request_id: str,
     service_type: str,
     official_result: Any,
@@ -243,12 +243,12 @@ def submit_official_result_record(
     vendor_request_id: str | None = None,
 ):
     validate_service_type(service_type)
-    if not source_product or not request_id:
-        json_error("PARAMETER_ERROR", "sourceProduct and requestId are required")
+    if not api_id or not request_id:
+        json_error("PARAMETER_ERROR", "apiId and requestId are required")
     raw_result_json = raw_result_text(official_result)
-    job = get_service_job_by_request(source_product, request_id, service_type)
+    job = get_service_job_by_request(api_id, request_id, service_type)
     base = build_official_result(
-        source_product,
+        api_id,
         request_id,
         service_type,
         raw_result_json,
@@ -259,11 +259,11 @@ def submit_official_result_record(
     if not job:
         pending = save_pending_official_result(base)
         if pending["result_hash"] != base["result_hash"]:
-            json_error("PARAMETER_ERROR", "same sourceProduct + requestId + serviceType submitted with different official result", 409)
+            json_error("PARAMETER_ERROR", "same apiId + requestId + serviceType submitted with different official result", 409)
         return {"status": "pending_task", "pendingId": pending["pending_id"]}
     official = insert_official_result({**base, "task_id": job["task_id"]})
     if official["result_hash"] != base["result_hash"]:
-        json_error("PARAMETER_ERROR", "same sourceProduct + requestId + serviceType submitted with different official result", 409)
+        json_error("PARAMETER_ERROR", "same apiId + requestId + serviceType submitted with different official result", 409)
     trigger_comparisons(job["task_id"])
     return {"status": "attached", "taskId": job["task_id"], "officialResultId": official["official_result_id"]}
 
@@ -300,7 +300,7 @@ def generic_task_payload(task_id: str):
     return {
         "taskId": job["task_id"],
         "serviceType": job["service_type"],
-        "sourceProduct": job["source_product"],
+        "apiId": job["api_id"],
         "requestId": job["request_id"],
         "status": job["status"],
         "rawPayload": maybe_json(job.get("raw_payload_json")),
@@ -360,7 +360,7 @@ def lease_generic_worker_tasks(capability: str, worker_id: str, limit: int):
             "workerTaskId": worker_task["worker_task_id"],
             "taskId": worker_task["task_id"],
             "serviceType": job["service_type"],
-            "sourceProduct": job["source_product"],
+            "apiId": job["api_id"],
             "requestId": job["request_id"],
             "capability": worker_task["capability"],
             "rawPayload": maybe_json(job.get("raw_payload_json")),
@@ -479,7 +479,7 @@ def complete_generic_worker_task(worker_task_id: str, worker_id: str, payload: d
 
 
 def build_job_and_tasks(
-    source_product: str,
+    api_id: str,
     request_id: str,
     vendor_request_id: str | None,
     first: dict,
@@ -495,7 +495,7 @@ def build_job_and_tasks(
         "job_id": job_id,
         "job_type": job_type,
         "request_id": request_id,
-        "source_product": source_product,
+        "api_id": api_id,
         "vendor_request_id": vendor_request_id,
         "first_image_uri": first_uri,
         "second_image_uri": second_uri,
@@ -525,20 +525,20 @@ def build_job_and_tasks(
     return job, tasks
 
 
-def create_service_compare_job(source_product: str, request_id: str, vendor_request_id: str | None, first_upload, second_upload):
+def create_service_compare_job(api_id: str, request_id: str, vendor_request_id: str | None, first_upload, second_upload):
     first = validate_service_image(first_upload)
     second = validate_service_image(second_upload)
-    existing = get_job_by_request(source_product, request_id)
+    existing = get_job_by_request(api_id, request_id)
     if existing:
         same_images = (
             existing["first_image_sha256"] == first["sha256"]
             and existing["second_image_sha256"] == second["sha256"]
         )
         if not same_images:
-            json_error("PARAMETER_ERROR", "same sourceProduct + requestId submitted with different images", 409)
+            json_error("PARAMETER_ERROR", "same apiId + requestId submitted with different images", 409)
         return existing["job_id"], existing["status"]
 
-    job, tasks = build_job_and_tasks(source_product, request_id, vendor_request_id, first, second, SERVICE_MODEL_CONFIG_IDS, JOB_TYPE_API_CHECK)
+    job, tasks = build_job_and_tasks(api_id, request_id, vendor_request_id, first, second, SERVICE_MODEL_CONFIG_IDS, JOB_TYPE_API_CHECK)
     try:
         create_compare_job(job, tasks)
     except Exception:
@@ -549,7 +549,7 @@ def create_service_compare_job(source_product: str, request_id: str, vendor_requ
 
 def create_local_service_job(
     *,
-    source_product: str,
+    api_id: str,
     request_id: str,
     first_path: str,
     second_path: str,
@@ -557,13 +557,13 @@ def create_local_service_job(
     job_type: str,
     threshold: str = "",
 ):
-    existing = get_job_by_request(source_product, request_id)
+    existing = get_job_by_request(api_id, request_id)
     if existing:
         tasks = get_job_tasks(existing["job_id"])
         return existing["job_id"], [task["task_id"] for task in tasks]
     first = image_meta_from_path(first_path)
     second = image_meta_from_path(second_path)
-    job, tasks = build_job_and_tasks(source_product, request_id, None, first, second, model_config_ids, job_type, threshold)
+    job, tasks = build_job_and_tasks(api_id, request_id, None, first, second, model_config_ids, job_type, threshold)
     create_compare_job(job, tasks)
     return job["job_id"], [task["task_id"] for task in tasks]
 
@@ -627,7 +627,7 @@ def service_job_payload(job_id: str):
         "jobId": job["job_id"],
         "jobType": job.get("job_type"),
         "requestId": job["request_id"],
-        "sourceProduct": job["source_product"],
+        "apiId": job["api_id"],
         "status": job["status"],
         "tasks": [
             {
@@ -665,15 +665,15 @@ def legacy_service_job_payload(job_id: str):
     return payload
 
 
-def submit_vendor_result(source_product: str, payload: dict[str, Any]):
+def submit_vendor_result(api_id: str, payload: dict[str, Any]):
     request_id = str(payload.get("requestId", "")).strip()
     vendor_name = str(payload.get("vendorName", "")).strip()
     vendor_request_id = str(payload.get("vendorRequestId", "")).strip()
     if not request_id or not vendor_name or not vendor_request_id:
         json_error("PARAMETER_ERROR", "requestId, vendorName and vendorRequestId are required")
-    job = get_job_by_request(source_product, request_id)
+    job = get_job_by_request(api_id, request_id)
     if not job:
-        json_error("PARAMETER_ERROR", "compare job not found for sourceProduct + requestId", 404)
+        json_error("PARAMETER_ERROR", "compare job not found for apiId + requestId", 404)
     normalized = dict(payload)
     normalized["vendorName"] = vendor_name
     normalized["vendorRequestId"] = vendor_request_id

@@ -39,16 +39,6 @@ DEFAULT_SERVICE_CAPABILITIES = {
     "blacklist": os.environ.get("FACE_SERVICE_BLACKLIST_CAPABILITY", "blacklist.engineering_v1"),
 }
 
-ACCESS_CLIENTS = {}
-ACCESS_KEY = os.environ.get("FACE_API_ACCESS_KEY")
-ACCESS_SECRET = os.environ.get("FACE_API_SECRET_KEY")
-if ACCESS_KEY and ACCESS_SECRET:
-    ACCESS_CLIENTS[ACCESS_KEY] = {
-        "secret_key": ACCESS_SECRET,
-        "source_product": os.environ.get("FACE_API_SOURCE_PRODUCT", "internal_product_a"),
-        "status": os.environ.get("FACE_API_ACCOUNT_STATUS", "enabled"),
-    }
-
 DEV_WORKER_ID = os.environ.get("FACE_WORKER_ID")
 DEV_WORKER_TOKEN = os.environ.get("FACE_WORKER_TOKEN")
 

@@ -2,8 +2,7 @@ from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.db.mysql import init_service_db
-from app.repositories.evaluation import init_evaluation_db
+from app.db.mysql import sync_worker_credentials
 from app.services.evaluation import enqueue_evaluate_job, list_evaluation_jobs
 from app.entrypoints.service_routes import router as service_router
 from app.services.web_compare import (
@@ -28,8 +27,7 @@ app.include_router(service_router)
 
 @app.on_event("startup")
 def startup():
-    init_service_db()
-    init_evaluation_db()
+    sync_worker_credentials()
 
 
 @app.get("/")

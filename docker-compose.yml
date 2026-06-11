@@ -13,9 +13,6 @@ services:
       FACE_MYSQL_DATABASE: "${FACE_MYSQL_DATABASE:?FACE_MYSQL_DATABASE is required}"
       FACE_SERVICE_MODEL_CONFIG_IDS: "${FACE_SERVICE_MODEL_CONFIG_IDS:-buffalo_l,arcface_retinaface_cosine,arcface_retinaface_euclidean_l2,facenet512_retinaface_cosine,ghostfacenet_retinaface_cosine}"
       FACE_WORKER_CREDENTIALS_JSON: '[{"worker_id":"worker-buffalo-l","worker_token":"${FACE_WORKER_BUFFALO_TOKEN:?FACE_WORKER_BUFFALO_TOKEN is required}","allowed_model_config_ids":["buffalo_l"],"allowed_capabilities":["face_compare.buffalo_l"]},{"worker_id":"worker-arcface-cosine","worker_token":"${FACE_WORKER_ARCFACE_COSINE_TOKEN:?FACE_WORKER_ARCFACE_COSINE_TOKEN is required}","allowed_model_config_ids":["arcface_retinaface_cosine"],"allowed_capabilities":["face_compare.arcface_retinaface_cosine"]},{"worker_id":"worker-arcface-euclidean-l2","worker_token":"${FACE_WORKER_ARCFACE_EUCLIDEAN_L2_TOKEN:?FACE_WORKER_ARCFACE_EUCLIDEAN_L2_TOKEN is required}","allowed_model_config_ids":["arcface_retinaface_euclidean_l2"],"allowed_capabilities":["face_compare.arcface_retinaface_euclidean_l2"]},{"worker_id":"worker-facenet512","worker_token":"${FACE_WORKER_FACENET512_TOKEN:?FACE_WORKER_FACENET512_TOKEN is required}","allowed_model_config_ids":["facenet512_retinaface_cosine"],"allowed_capabilities":["face_compare.facenet512_retinaface_cosine"]},{"worker_id":"worker-ghostfacenet","worker_token":"${FACE_WORKER_GHOSTFACENET_TOKEN:?FACE_WORKER_GHOSTFACENET_TOKEN is required}","allowed_model_config_ids":["ghostfacenet_retinaface_cosine"],"allowed_capabilities":["face_compare.ghostfacenet_retinaface_cosine"]}]'
-      FACE_API_ACCESS_KEY: "${FACE_API_ACCESS_KEY:?FACE_API_ACCESS_KEY is required}"
-      FACE_API_SECRET_KEY: "${FACE_API_SECRET_KEY:?FACE_API_SECRET_KEY is required}"
-      FACE_API_SOURCE_PRODUCT: "${FACE_API_SOURCE_PRODUCT:-internal_product_a}"
     volumes:
       - ./.data:/app/.data
       - ./.models:/app/.models

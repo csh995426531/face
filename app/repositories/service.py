@@ -3,14 +3,20 @@ import json
 from app.db.mysql import db_connect, load_compare_job, load_compare_job_by_request, load_compare_results, load_compare_tasks, now_ts, row_to_dict
 
 
-def create_access_token(token_hash_value: str, access_key: str, source_product: str, expires_at: float):
+def get_api_client(access_key: str):
+    with db_connect() as conn:
+        row = conn.execute("SELECT * FROM api_clients WHERE access_key = %s", (access_key,)).fetchone()
+    return row_to_dict(row)
+
+
+def create_access_token(token_hash_value: str, access_key: str, api_id: str, expires_at: float):
     with db_connect() as conn:
         conn.execute(
             """
-            INSERT INTO access_tokens (token_hash, access_key, source_product, expires_at, created_at)
+            INSERT INTO access_tokens (token_hash, access_key, api_id, expires_at, created_at)
             VALUES (%s, %s, %s, %s, %s)
             """,
-            (token_hash_value, access_key, source_product, expires_at, now_ts()),
+            (token_hash_value, access_key, api_id, expires_at, now_ts()),
         )
 
 
@@ -18,8 +24,13 @@ def get_access_token(token_hash_value: str):
     with db_connect() as conn:
         row = conn.execute(
             """
-            SELECT access_key, source_product, expires_at
+            SELECT
+                access_tokens.access_key,
+                access_tokens.api_id,
+                access_tokens.expires_at,
+                api_clients.status AS client_status
             FROM access_tokens
+            INNER JOIN api_clients ON api_clients.access_key = access_tokens.access_key
             WHERE token_hash = %s
             """,
             (token_hash_value,),
@@ -47,9 +58,9 @@ def get_job(job_id: str):
         return load_compare_job(conn, job_id)
 
 
-def get_job_by_request(source_product: str, request_id: str):
+def get_job_by_request(api_id: str, request_id: str):
     with db_connect() as conn:
-        return load_compare_job_by_request(conn, source_product, request_id)
+        return load_compare_job_by_request(conn, api_id, request_id)
 
 
 def get_job_tasks(job_id: str):
@@ -68,14 +79,14 @@ def get_service_job(task_id: str):
     return row_to_dict(row)
 
 
-def get_service_job_by_request(source_product: str, request_id: str, service_type: str):
+def get_service_job_by_request(api_id: str, request_id: str, service_type: str):
     with db_connect() as conn:
         row = conn.execute(
             """
             SELECT * FROM service_jobs
-            WHERE source_product = %s AND request_id = %s AND service_type = %s
+            WHERE api_id = %s AND request_id = %s AND service_type = %s
             """,
-            (source_product, request_id, service_type),
+            (api_id, request_id, service_type),
         ).fetchone()
     return row_to_dict(row)
 
@@ -141,14 +152,14 @@ def create_service_job_bundle(job: dict, assets: list[dict], worker_tasks: list[
         conn.execute(
             """
             INSERT INTO service_jobs (
-                task_id, service_type, source_product, request_id, status,
+                task_id, service_type, api_id, request_id, status,
                 raw_payload_json, payload_hash, assets_hash, metadata_json, created_at, updated_at
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 job["task_id"],
                 job["service_type"],
-                job["source_product"],
+                job["api_id"],
                 job["request_id"],
                 job["status"],
                 job.get("raw_payload_json"),
@@ -191,14 +202,14 @@ def create_service_job_bundle(job: dict, assets: list[dict], worker_tasks: list[
             )
 
 
-def get_pending_official_result(source_product: str, request_id: str, service_type: str):
+def get_pending_official_result(api_id: str, request_id: str, service_type: str):
     with db_connect() as conn:
         row = conn.execute(
             """
             SELECT * FROM pending_official_results
-            WHERE source_product = %s AND request_id = %s AND service_type = %s AND attached_task_id IS NULL
+            WHERE api_id = %s AND request_id = %s AND service_type = %s AND attached_task_id IS NULL
             """,
-            (source_product, request_id, service_type),
+            (api_id, request_id, service_type),
         ).fetchone()
     return row_to_dict(row)
 
@@ -208,7 +219,7 @@ def insert_official_result(result: dict):
         conn.execute(
             """
             INSERT INTO official_results (
-                official_result_id, task_id, source_product, request_id, service_type,
+                official_result_id, task_id, api_id, request_id, service_type,
                 official_status, official_elapsed_ms, vendor_request_id,
                 raw_result_json, result_hash, created_at
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -217,7 +228,7 @@ def insert_official_result(result: dict):
             (
                 result["official_result_id"],
                 result["task_id"],
-                result["source_product"],
+                result["api_id"],
                 result["request_id"],
                 result["service_type"],
                 result.get("official_status"),
@@ -231,9 +242,9 @@ def insert_official_result(result: dict):
         row = conn.execute(
             """
             SELECT * FROM official_results
-            WHERE source_product = %s AND request_id = %s AND service_type = %s
+            WHERE api_id = %s AND request_id = %s AND service_type = %s
             """,
-            (result["source_product"], result["request_id"], result["service_type"]),
+            (result["api_id"], result["request_id"], result["service_type"]),
         ).fetchone()
     return row_to_dict(row)
 
@@ -243,14 +254,14 @@ def save_pending_official_result(result: dict):
         conn.execute(
             """
             INSERT INTO pending_official_results (
-                pending_id, source_product, request_id, service_type, official_status,
+                pending_id, api_id, request_id, service_type, official_status,
                 official_elapsed_ms, vendor_request_id, raw_result_json, result_hash, created_at
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE pending_id = pending_id
             """,
             (
                 result["pending_id"],
-                result["source_product"],
+                result["api_id"],
                 result["request_id"],
                 result["service_type"],
                 result.get("official_status"),
@@ -264,9 +275,9 @@ def save_pending_official_result(result: dict):
         row = conn.execute(
             """
             SELECT * FROM pending_official_results
-            WHERE source_product = %s AND request_id = %s AND service_type = %s
+            WHERE api_id = %s AND request_id = %s AND service_type = %s
             """,
-            (result["source_product"], result["request_id"], result["service_type"]),
+            (result["api_id"], result["request_id"], result["service_type"]),
         ).fetchone()
     return row_to_dict(row)
 
@@ -477,7 +488,7 @@ def create_compare_job(job: dict, tasks: list[dict]):
         conn.execute(
             """
             INSERT INTO compare_jobs (
-                job_id, job_type, request_id, source_product, vendor_request_id,
+                job_id, job_type, request_id, api_id, vendor_request_id,
                 first_image_uri, second_image_uri, first_image_sha256, second_image_sha256,
                 first_image_size_bytes, second_image_size_bytes, first_image_mime, second_image_mime,
                 first_original_filename, second_original_filename, status, created_at, updated_at
@@ -487,7 +498,7 @@ def create_compare_job(job: dict, tasks: list[dict]):
                 job["job_id"],
                 job["job_type"],
                 job["request_id"],
-                job["source_product"],
+                job["api_id"],
                 job.get("vendor_request_id"),
                 job["first_image_uri"],
                 job["second_image_uri"],

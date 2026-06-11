@@ -38,7 +38,7 @@ def enqueue_evaluate_job(positive_limit_per_group: int, negative_limit_per_group
     try:
         for index, pair in enumerate(pairs, start=1):
             compare_job_id, _task_ids = create_local_service_job(
-                source_product="web_poc_evaluation",
+                api_id="web_poc_evaluation",
                 request_id=f"{job_id}:{index}",
                 first_path=str(resolve_dataset_path(pair["image_a"])),
                 second_path=str(resolve_dataset_path(pair["image_b"])),

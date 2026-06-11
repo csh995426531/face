@@ -9,7 +9,7 @@ const main = read("app/main.py");
 const routes = read("app/entrypoints/service_routes.py");
 const webCompare = read("app/services/web_compare.py");
 const evaluation = read("app/services/evaluation.py");
-const mysql = read("app/db/mysql.py");
+const schema = read("migrations/0001_init_schema.sql");
 const worker = read("worker/main.py");
 const compose = read("docker-compose.yml");
 
@@ -24,7 +24,7 @@ assert(
 );
 
 assert(
-  mysql.includes("job_type"),
+  schema.includes("job_type"),
   "compare_jobs must persist job_type to distinguish web_single, web_evaluation, and api_check"
 );
 

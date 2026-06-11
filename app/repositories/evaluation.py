@@ -4,38 +4,6 @@ from typing import Any
 from app.db.mysql import db_connect
 
 
-def init_evaluation_db():
-    with db_connect() as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS evaluation_jobs (
-                job_id VARCHAR(96) PRIMARY KEY,
-                status VARCHAR(32) NOT NULL,
-                created_at REAL NOT NULL,
-                updated_at REAL NOT NULL,
-                positive_limit_per_group INTEGER NOT NULL,
-                negative_limit_per_group INTEGER NOT NULL,
-                pairs INTEGER,
-                positive_pairs INTEGER,
-                negative_pairs INTEGER,
-                payload_json JSON NOT NULL,
-                KEY idx_evaluation_jobs_updated_at (updated_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS evaluation_model_results (
-                job_id VARCHAR(96) NOT NULL,
-                config_id VARCHAR(128) NOT NULL,
-                summary_json JSON NOT NULL,
-                details_json JSON NOT NULL,
-                PRIMARY KEY (job_id, config_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            """
-        )
-
-
 def save_evaluation_job(job: dict[str, Any]):
     with db_connect() as conn:
         conn.execute(

@@ -22,7 +22,7 @@ def enqueue_compare_job(config_id: str, image_a: UploadFile, image_b: UploadFile
     path_b = save_upload(image_b)
     try:
         job_id, _task_ids = create_local_service_job(
-            source_product="web_poc",
+            api_id="web_poc",
             request_id=uuid.uuid4().hex,
             first_path=path_a,
             second_path=path_b,
@@ -43,7 +43,7 @@ def enqueue_server_compare_job(config_id: str, image_a_path: str, image_b_path: 
     path_a = resolve_dataset_path(image_a_path)
     path_b = resolve_dataset_path(image_b_path)
     job_id, _task_ids = create_local_service_job(
-        source_product="web_poc_dataset",
+        api_id="web_poc_dataset",
         request_id=uuid.uuid4().hex,
         first_path=str(path_a),
         second_path=str(path_b),

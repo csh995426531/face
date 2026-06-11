@@ -7,6 +7,20 @@ This project has two runtime roles:
 
 MySQL is external. The project does not start or manage MySQL.
 
+## Schema Migration
+
+Run an explicit SQL migration before starting a new API version.
+
+First deployment:
+
+```bash
+python -m scripts.migrate migrations/0001_init_schema.sql
+```
+
+For later iterations, add a new SQL file under `migrations/` and run that file explicitly before starting the new API version.
+
+After the schema migration, insert the required `api_clients` rows, then start the API.
+
 ## API
 
 ```bash

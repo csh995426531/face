@@ -77,12 +77,12 @@ def create_service_compare_job(
     x_access_token: str | None = Header(default=None),
 ):
     token = require_access_token(x_access_token)
-    source_product = token["source_product"] or sourceProduct
+    api_id = token["api_id"]
     request_id = requestId.strip()
     if not request_id:
         json_error("PARAMETER_ERROR", "requestId is required")
     job_id, status = create_service_compare_job_service(
-        source_product,
+        api_id,
         request_id,
         vendorRequestId.strip() or None,
         firstImage,
@@ -97,7 +97,7 @@ async def create_generic_task(request: Request, x_access_token: str | None = Hea
     form = await request.form()
     service_type = str(form.get("serviceType", "")).strip()
     request_id = str(form.get("requestId", "")).strip()
-    source_product = token["source_product"] or str(form.get("sourceProduct", "")).strip()
+    api_id = token["api_id"]
     payload_json = form.get("payloadJson")
     official_result_json = form.get("officialResultJson")
     payload_json = str(payload_json) if payload_json is not None else None
@@ -126,7 +126,7 @@ async def create_generic_task(request: Request, x_access_token: str | None = Hea
         )
     job, created = create_generic_service_task(
         service_type=service_type,
-        source_product=source_product,
+        api_id=api_id,
         request_id=request_id,
         raw_payload_json=payload_json,
         assets=assets,
@@ -148,9 +148,8 @@ async def create_generic_task(request: Request, x_access_token: str | None = Hea
 @router.post("/api/official-results")
 def submit_official_result(payload: dict[str, Any] = Body(...), x_access_token: str | None = Header(default=None)):
     token = require_access_token(x_access_token)
-    source_product = token["source_product"] or str(payload.get("sourceProduct", "")).strip()
     result = submit_official_result_record(
-        source_product=source_product,
+        api_id=token["api_id"],
         request_id=str(payload.get("requestId", "")).strip(),
         service_type=str(payload.get("serviceType", "")).strip(),
         official_result=payload.get("officialResult", {}),
@@ -163,18 +162,18 @@ def submit_official_result(payload: dict[str, Any] = Body(...), x_access_token: 
 
 @router.get("/api/tasks/{task_id}")
 def get_generic_task(task_id: str, x_access_token: str | None = Header(default=None)):
-    require_access_token(x_access_token)
+    token = require_access_token(x_access_token)
     payload = generic_task_payload(task_id)
-    if not payload:
+    if not payload or payload.get("apiId") != token["api_id"]:
         json_error("PARAMETER_ERROR", f"unknown taskId: {task_id}", 404)
     return payload
 
 
 @router.get("/internal/face-recognition/jobs/{job_id}")
 def get_service_job(job_id: str, x_access_token: str | None = Header(default=None)):
-    require_access_token(x_access_token)
+    token = require_access_token(x_access_token)
     payload = service_job_payload(job_id)
-    if not payload:
+    if not payload or payload.get("apiId") != token["api_id"]:
         json_error("PARAMETER_ERROR", f"unknown jobId: {job_id}", 404)
     return payload
 
@@ -182,7 +181,7 @@ def get_service_job(job_id: str, x_access_token: str | None = Header(default=Non
 @router.post("/internal/face-recognition/vendor-results")
 def submit_vendor_result(payload: dict[str, Any] = Body(...), x_access_token: str | None = Header(default=None)):
     token = require_access_token(x_access_token)
-    job_id = submit_vendor_result_service(token["source_product"], payload)
+    job_id = submit_vendor_result_service(token["api_id"], payload)
     return {"code": 0, "message": "accepted", "jobId": job_id}
 
 
