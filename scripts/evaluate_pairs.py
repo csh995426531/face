@@ -4,7 +4,7 @@ import json
 import statistics
 import time
 
-from compare import compare_buffalo, compare_deepface
+from app.core.compare import compare_buffalo, compare_deepface
 
 
 def parse_args():

@@ -74,6 +74,28 @@
         white-space: nowrap;
       }
 
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin: 0 0 18px;
+      }
+
+      .tab-button {
+        background: #ffffff;
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+
+      .tab-button.active {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border-color: var(--accent);
+      }
+
+      .tab-panel[hidden] {
+        display: none;
+      }
+
       main {
         display: grid;
         grid-template-columns: minmax(340px, 0.9fr) minmax(420px, 1.1fr);
@@ -125,7 +147,19 @@
         font-size: 14px;
       }
 
+      .source-grid {
+        display: grid;
+        grid-template-columns: 150px 1fr 1fr;
+        gap: 10px;
+      }
+
       .drop-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .face-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 12px;
@@ -133,7 +167,7 @@
 
       .drop {
         position: relative;
-        min-height: 210px;
+        min-height: 260px;
         border: 1px dashed #9eacb8;
         border-radius: 8px;
         background: #fbfcfd;
@@ -149,7 +183,7 @@
 
       .preview {
         width: 100%;
-        height: 170px;
+        min-height: 220px;
         display: grid;
         place-items: center;
         background: #f0f3f5;
@@ -157,9 +191,29 @@
 
       .preview img {
         width: 100%;
-        height: 100%;
+        height: auto;
+        max-height: 360px;
         object-fit: contain;
         display: none;
+        cursor: zoom-in;
+      }
+
+      .face-crop {
+        min-height: 180px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f7f9fa;
+        overflow: hidden;
+      }
+
+      .face-crop .preview {
+        min-height: 145px;
+      }
+
+      .face-crop .drop-copy {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
       }
 
       .preview-note {
@@ -268,9 +322,87 @@
         color: #8a1f11;
       }
 
+      .eval-layout {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 18px;
+      }
+
+      .eval-controls {
+        display: grid;
+        gap: 14px;
+      }
+
+      .table-wrap {
+        overflow: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: ui-sans-serif, "Avenir Next", "Noto Sans SC", sans-serif;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px 8px;
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .progress-list {
+        display: grid;
+        gap: 8px;
+        margin: 12px 0;
+        font-family: ui-sans-serif, "Avenir Next", "Noto Sans SC", sans-serif;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      dialog {
+        width: min(92vw, 1120px);
+        border: 0;
+        border-radius: 8px;
+        padding: 0;
+        background: #0e151b;
+      }
+
+      dialog::backdrop {
+        background: rgba(10, 15, 20, 0.72);
+      }
+
+      .lightbox {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+      }
+
+      .lightbox img {
+        width: 100%;
+        max-height: 82vh;
+        object-fit: contain;
+        background: #111820;
+      }
+
+      .lightbox button {
+        justify-self: end;
+        background: #ffffff;
+        color: var(--ink);
+      }
+
       @media (max-width: 900px) {
         header,
-        main {
+        main,
+        .eval-layout {
           display: block;
         }
 
@@ -300,7 +432,12 @@
         <div class="status-pill" id="configStatus">Loading configs</div>
       </header>
 
-      <main>
+      <div class="tabs">
+        <button class="tab-button active" id="compareTabButton">单次比对</button>
+        <button class="tab-button" id="evaluateTabButton">批量评估</button>
+      </div>
+
+      <main class="tab-panel" id="comparePanel">
         <section class="panel">
           <div class="panel-inner">
             <h2 class="section-title">Input</h2>
@@ -315,6 +452,24 @@
               <p class="hint" id="thresholdHint">DeepFace 距离越小越像；Buffalo_L cosine similarity 越大越像。</p>
             </div>
 
+            <div class="field">
+              <label>模型缓存</label>
+              <p class="hint" id="cacheStatus">Loading cache status</p>
+            </div>
+
+            <div class="field">
+              <label for="sourceMode">图片来源</label>
+              <div class="source-grid">
+                <select id="sourceMode">
+                  <option value="dataset">服务器数据集</option>
+                  <option value="upload">本地上传</option>
+                </select>
+                <select id="serverImageA"></select>
+                <select id="serverImageB"></select>
+              </div>
+              <p class="hint" id="datasetStatus">Loading dataset images</p>
+            </div>
+
             <div class="field drop-grid">
               <label class="drop">
                 <div class="preview"><img id="previewA" alt="Image A preview" /></div>
@@ -327,6 +482,21 @@
                 <div class="drop-copy">照片 B</div>
                 <input id="imageB" type="file" accept="image/*" />
               </label>
+            </div>
+
+            <div class="field">
+              <label>检测裁剪预览</label>
+              <div class="face-grid">
+                <div class="face-crop">
+                  <div class="preview"><img id="facePreviewA" alt="Detected face A" /></div>
+                  <div class="drop-copy"><span>Face A</span><span id="faceMetaA">-</span></div>
+                </div>
+                <div class="face-crop">
+                  <div class="preview"><img id="facePreviewB" alt="Detected face B" /></div>
+                  <div class="drop-copy"><span>Face B</span><span id="faceMetaB">-</span></div>
+                </div>
+              </div>
+              <p class="hint">这里显示 Buffalo_L 实际检测到并用于提特征的人脸区域。若裁剪错位或人脸很小，分数会不稳定。</p>
             </div>
 
             <div class="actions">
@@ -356,14 +526,102 @@
           </div>
         </section>
       </main>
+
+      <section class="tab-panel" id="evaluatePanel" hidden>
+        <div class="eval-layout">
+          <section class="panel">
+            <div class="panel-inner">
+              <h2 class="section-title">Evaluation</h2>
+              <div class="eval-controls">
+                <div>
+                  <label for="positiveLimit">每组正样本上限</label>
+                  <input id="positiveLimit" type="number" min="1" max="50" value="8" />
+                </div>
+                <div>
+                  <label for="negativeLimit">每组负样本上限</label>
+                  <input id="negativeLimit" type="number" min="1" max="100" value="8" />
+                </div>
+                <button id="runEvalButton">跑 5 组评估</button>
+                <button id="refreshEvalJobsButton" type="button">刷新历史任务</button>
+                <p class="hint" id="evalHint">使用服务器数据集生成 pairs：同文件夹为正样本，跨文件夹为负样本。</p>
+                <label for="evalJobHistory">历史评估任务</label>
+                <select id="evalJobHistory"></select>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-inner">
+              <div class="result-head">
+                <div>
+                  <h2 class="section-title">Model Ranking</h2>
+                  <p class="verdict" id="evalVerdict">等待评估</p>
+                </div>
+                <span class="status-pill" id="evalStatus">No job</span>
+              </div>
+
+              <div class="metric">
+                <div><span>Pairs</span><strong id="evalPairs">-</strong></div>
+                <div><span>Positive</span><strong id="evalPositive">-</strong></div>
+                <div><span>Negative</span><strong id="evalNegative">-</strong></div>
+              </div>
+
+              <div class="progress-list" id="evalProgress"></div>
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Model</th>
+                      <th>Threshold</th>
+                      <th>Accuracy</th>
+                      <th>FAR</th>
+                      <th>FRR</th>
+                      <th>FAR0 FRR</th>
+                      <th>AUC</th>
+                      <th>OK/Fail</th>
+                      <th>Avg ms</th>
+                      <th>Pos Range</th>
+                      <th>Neg Range</th>
+                    </tr>
+                  </thead>
+                  <tbody id="evalTableBody"></tbody>
+                </table>
+              </div>
+
+              <pre id="evalJson">{}</pre>
+            </div>
+          </section>
+        </div>
+      </section>
     </div>
+
+    <dialog id="lightbox">
+      <div class="lightbox">
+        <img id="lightboxImage" alt="Preview large" />
+        <button id="closeLightbox">关闭</button>
+      </div>
+    </dialog>
 
     <script>
       const configSelect = document.getElementById("config");
+      const compareTabButton = document.getElementById("compareTabButton");
+      const evaluateTabButton = document.getElementById("evaluateTabButton");
+      const comparePanel = document.getElementById("comparePanel");
+      const evaluatePanel = document.getElementById("evaluatePanel");
       const configStatus = document.getElementById("configStatus");
       const rank = document.getElementById("rank");
+      const cacheStatus = document.getElementById("cacheStatus");
       const imageA = document.getElementById("imageA");
       const imageB = document.getElementById("imageB");
+      const sourceMode = document.getElementById("sourceMode");
+      const serverImageA = document.getElementById("serverImageA");
+      const serverImageB = document.getElementById("serverImageB");
+      const datasetStatus = document.getElementById("datasetStatus");
+      const facePreviewA = document.getElementById("facePreviewA");
+      const facePreviewB = document.getElementById("facePreviewB");
+      const faceMetaA = document.getElementById("faceMetaA");
+      const faceMetaB = document.getElementById("faceMetaB");
       const threshold = document.getElementById("threshold");
       const runButton = document.getElementById("runButton");
       const verdict = document.getElementById("verdict");
@@ -372,8 +630,26 @@
       const elapsed = document.getElementById("elapsed");
       const json = document.getElementById("json");
       const runHint = document.getElementById("runHint");
+      const lightbox = document.getElementById("lightbox");
+      const lightboxImage = document.getElementById("lightboxImage");
+      const closeLightbox = document.getElementById("closeLightbox");
+      const positiveLimit = document.getElementById("positiveLimit");
+      const negativeLimit = document.getElementById("negativeLimit");
+      const runEvalButton = document.getElementById("runEvalButton");
+      const refreshEvalJobsButton = document.getElementById("refreshEvalJobsButton");
+      const evalJobHistory = document.getElementById("evalJobHistory");
+      const evalHint = document.getElementById("evalHint");
+      const evalVerdict = document.getElementById("evalVerdict");
+      const evalStatus = document.getElementById("evalStatus");
+      const evalPairs = document.getElementById("evalPairs");
+      const evalPositive = document.getElementById("evalPositive");
+      const evalNegative = document.getElementById("evalNegative");
+      const evalProgress = document.getElementById("evalProgress");
+      const evalTableBody = document.getElementById("evalTableBody");
+      const evalJson = document.getElementById("evalJson");
 
       let configs = [];
+      let datasetImages = [];
       const MAX_UPLOAD_SIDE = 1024;
       const JPEG_QUALITY = 0.84;
 
@@ -510,6 +786,141 @@
         }
       }
 
+      function sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      function setTab(name) {
+        const compareActive = name === "compare";
+        comparePanel.hidden = !compareActive;
+        evaluatePanel.hidden = compareActive;
+        compareTabButton.classList.toggle("active", compareActive);
+        evaluateTabButton.classList.toggle("active", !compareActive);
+      }
+
+      async function pollJob(jobId) {
+        while (true) {
+          const response = await fetch(apiUrl(`api/jobs/${jobId}`));
+          const job = await readPayload(response);
+          json.textContent = JSON.stringify(job, null, 2);
+
+          if (job.status === "done") {
+            return job.result;
+          }
+
+          if (job.status === "error") {
+            throw new Error(job.error || "compare job failed");
+          }
+
+          verdict.textContent = job.status === "queued" ? "Queued" : "Running";
+          runHint.textContent = `后台任务 ${job.status} · ${jobId.slice(0, 8)}。模型首次下载/加载可能很慢。`;
+          await sleep(2000);
+        }
+      }
+
+      function rangeText(range) {
+        return Array.isArray(range) ? `${range[0]} - ${range[1]}` : "-";
+      }
+
+      function renderEval(job) {
+        evalJson.textContent = JSON.stringify(job, null, 2);
+        evalStatus.textContent = `${job.status} · ${job.job_id ? job.job_id.slice(0, 8) : ""}`;
+        evalPairs.textContent = job.pairs ?? "-";
+        evalPositive.textContent = job.positive_pairs ?? "-";
+        evalNegative.textContent = job.negative_pairs ?? "-";
+        evalVerdict.textContent = job.status === "done" ? "完成" : job.status === "error" ? "Error" : "Running";
+
+        const progress = job.progress || {};
+        evalProgress.innerHTML = Object.entries(progress)
+          .map(([model, item]) => `<div>${model}: ${item.status} · ${item.done}/${item.total}</div>`)
+          .join("");
+
+        const summaries = [...(job.summaries || [])].sort((a, b) => {
+          if ((b.auc ?? -1) !== (a.auc ?? -1)) return (b.auc ?? -1) - (a.auc ?? -1);
+          if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
+          return a.far - b.far;
+        });
+        evalTableBody.innerHTML = summaries
+          .map((row) => `
+            <tr>
+              <td>${row.label || row.config_id}</td>
+              <td>${row.best_threshold ?? "-"}</td>
+              <td>${row.accuracy ?? "-"}</td>
+              <td>${row.far ?? "-"}</td>
+              <td>${row.frr ?? "-"}</td>
+              <td>${row.zero_far_frr ?? "-"} @ ${row.zero_far_threshold ?? "-"}</td>
+              <td>${row.auc ?? "-"}</td>
+              <td>${row.ok ?? 0}/${row.failed ?? 0}</td>
+              <td>${row.avg_latency_ms ?? "-"}</td>
+              <td>${rangeText(row.positive_score_range)}</td>
+              <td>${rangeText(row.negative_score_range)}</td>
+            </tr>
+          `)
+          .join("");
+      }
+
+      async function pollEvalJob(jobId) {
+        while (true) {
+          const response = await fetch(apiUrl(`api/jobs/${jobId}`));
+          const job = await readPayload(response);
+          renderEval(job);
+          if (job.status === "done") return job;
+          if (job.status === "error") throw new Error(job.error || "evaluation failed");
+          await sleep(2500);
+        }
+      }
+
+      async function runEvaluation() {
+        runEvalButton.disabled = true;
+        evalVerdict.textContent = "Running";
+        evalHint.textContent = "评估会串行跑 5 个模型，CPU 环境可能需要几分钟。";
+        try {
+          const form = new FormData();
+          form.append("positive_limit_per_group", positiveLimit.value);
+          form.append("negative_limit_per_group", negativeLimit.value);
+          const response = await fetch(apiUrl("api/evaluate-jobs"), { method: "POST", body: form });
+          const job = await readPayload(response);
+          if (!response.ok) {
+            throw new Error(job.detail || "failed to create evaluation job");
+          }
+          renderEval(job);
+          await pollEvalJob(job.job_id);
+          evalHint.textContent = "评估完成。排序默认优先 AUC，其次 Accuracy，再看 FAR。";
+        } catch (error) {
+          evalVerdict.textContent = "Error";
+          evalJson.textContent = JSON.stringify({ error: error.message }, null, 2);
+        } finally {
+          runEvalButton.disabled = false;
+        }
+      }
+
+      async function loadEvaluationJobs({ openSelected = false } = {}) {
+        const response = await fetch(apiUrl("api/evaluate-jobs"));
+        const data = await readPayload(response);
+        const jobs = data.jobs || [];
+        const currentJobId = evalJobHistory.value;
+        evalJobHistory.innerHTML = jobs
+          .map((job) => `<option value="${job.job_id}">${job.status} · ${job.job_id.slice(0, 8)} · pairs ${job.pairs ?? "-"}</option>`)
+          .join("");
+        if (currentJobId && jobs.some((job) => job.job_id === currentJobId)) {
+          evalJobHistory.value = currentJobId;
+        } else if (jobs.length) {
+          evalJobHistory.value = jobs[0].job_id;
+        }
+        if (openSelected && evalJobHistory.value) {
+          await openSelectedEvalJob();
+        }
+        return jobs;
+      }
+
+      async function openSelectedEvalJob() {
+        if (!evalJobHistory.value) return;
+        const response = await fetch(apiUrl(`api/jobs/${evalJobHistory.value}`));
+        const job = await readPayload(response);
+        renderEval(job);
+        setTab("evaluate");
+      }
+
       async function loadConfigs() {
         const response = await fetch(apiUrl("api/configs"));
         configs = await readPayload(response);
@@ -520,41 +931,173 @@
         updateConfigMeta();
       }
 
+      async function loadCacheStatus() {
+        const response = await fetch(apiUrl("api/cache"));
+        const cache = await readPayload(response);
+        const insightCount = cache.insightface_files.length;
+        const deepfaceCount = cache.deepface_files.length;
+        cacheStatus.textContent = `InsightFace: ${insightCount} files · DeepFace: ${deepfaceCount} files · ${cache.deepface_weights}`;
+      }
+
+      function datasetLabel(item) {
+        return `${item.group}/${item.name} · ${item.size_mb} MB`;
+      }
+
+      async function loadDatasetImages() {
+        const response = await fetch(apiUrl("api/dataset"));
+        const data = await readPayload(response);
+        datasetImages = data.images;
+        if (datasetImages.length === 0) {
+          datasetStatus.textContent = `No images under ${data.dataset_root}`;
+          serverImageA.innerHTML = "";
+          serverImageB.innerHTML = "";
+          return;
+        }
+
+        const options = datasetImages
+          .map((item) => `<option value="${item.path}">${datasetLabel(item)}</option>`)
+          .join("");
+        serverImageA.innerHTML = options;
+        serverImageB.innerHTML = options;
+
+        const defaultA = datasetImages.find((item) => item.name.toLowerCase().startsWith("id_1")) || datasetImages[0];
+        const defaultB = datasetImages.find((item) => item.name.toLowerCase().startsWith("selfie_1")) || datasetImages[1] || datasetImages[0];
+        serverImageA.value = defaultA.path;
+        serverImageB.value = defaultB.path;
+        datasetStatus.textContent = `${datasetImages.length} server images · ${data.dataset_root}`;
+        await Promise.all([previewServerImage(serverImageA.value, "previewA"), previewServerImage(serverImageB.value, "previewB")]);
+      }
+
+      async function previewServerImage(relativePath, imgId) {
+        const img = document.getElementById(imgId);
+        const note = img.parentElement.querySelector(".preview-note") || document.createElement("div");
+        note.className = "preview-note";
+        note.textContent = `加载服务器图片：${relativePath}`;
+        img.parentElement.appendChild(note);
+        img.onload = () => {
+          note.remove();
+          img.style.display = "block";
+        };
+        img.onerror = () => {
+          img.style.display = "none";
+          note.textContent = `无法预览服务器图片：${relativePath}`;
+        };
+        img.src = apiUrl(`api/dataset/preview?path=${encodeURIComponent(relativePath)}&t=${Date.now()}`);
+      }
+
+      async function previewDetectedFace(relativePath, img, metaEl) {
+        const note = img.parentElement.querySelector(".preview-note") || document.createElement("div");
+        note.className = "preview-note";
+        note.textContent = `检测中：${relativePath}`;
+        img.parentElement.appendChild(note);
+        metaEl.textContent = "-";
+
+        try {
+          const response = await fetch(apiUrl(`api/detect/server?path=${encodeURIComponent(relativePath)}&t=${Date.now()}`));
+          if (!response.ok) {
+            const payload = await response.text();
+            throw new Error(payload);
+          }
+          const blob = await response.blob();
+          const bbox = response.headers.get("X-Face-Bbox") || "";
+          const detScore = response.headers.get("X-Face-Det-Score") || "";
+          const imageSize = response.headers.get("X-Face-Image-Size") || "";
+          img.onload = () => {
+            note.remove();
+            img.style.display = "block";
+          };
+          img.onerror = () => {
+            img.style.display = "none";
+            note.textContent = `检测裁剪图无法显示：${relativePath}`;
+          };
+          img.src = URL.createObjectURL(blob);
+          metaEl.textContent = `score ${detScore} · ${imageSize} · ${bbox}`;
+        } catch (error) {
+          img.style.display = "none";
+          note.textContent = `检测失败：${relativePath}`;
+          metaEl.textContent = "detect failed";
+        }
+      }
+
+      async function updateDetectedFaces() {
+        if (sourceMode.value !== "dataset" || !serverImageA.value || !serverImageB.value) {
+          facePreviewA.style.display = "none";
+          facePreviewB.style.display = "none";
+          faceMetaA.textContent = "-";
+          faceMetaB.textContent = "-";
+          return;
+        }
+        await Promise.all([
+          previewDetectedFace(serverImageA.value, facePreviewA, faceMetaA),
+          previewDetectedFace(serverImageB.value, facePreviewB, faceMetaB),
+        ]);
+      }
+
+      function updateSourceMode() {
+        const datasetMode = sourceMode.value === "dataset";
+        serverImageA.disabled = !datasetMode;
+        serverImageB.disabled = !datasetMode;
+        imageA.disabled = datasetMode;
+        imageB.disabled = datasetMode;
+        runHint.textContent = datasetMode ? "服务器数据集模式不会上传图片，可绕过 nginx 文件大小限制。" : "本地上传模式会先压缩图片再提交。";
+        if (datasetMode && serverImageA.value && serverImageB.value) {
+          previewServerImage(serverImageA.value, "previewA");
+          previewServerImage(serverImageB.value, "previewB");
+          updateDetectedFaces();
+        }
+      }
+
       async function runCompare() {
-        if (!imageA.files[0] || !imageB.files[0]) {
+        const datasetMode = sourceMode.value === "dataset";
+        if (!datasetMode && (!imageA.files[0] || !imageB.files[0])) {
           verdict.textContent = "请先上传两张图片";
           verdict.className = "verdict error";
           return;
         }
 
+        if (datasetMode && (!serverImageA.value || !serverImageB.value)) {
+          verdict.textContent = "请先选择服务器图片";
+          verdict.className = "verdict error";
+          return;
+        }
+
         runButton.disabled = true;
-        runHint.textContent = "正在压缩图片并提交。首次运行模型可能需要下载和加载权重。";
+        runHint.textContent = datasetMode ? "正在创建服务器图片比对任务。" : "正在压缩图片并提交。首次运行模型可能需要下载和加载权重。";
         verdict.textContent = "Running";
         verdict.className = "verdict";
 
         try {
-          const [compressedA, compressedB] = await Promise.all([
-            compressImageFile(imageA.files[0]),
-            compressImageFile(imageB.files[0]),
-          ]);
-          const originalSize = imageA.files[0].size + imageB.files[0].size;
-          const compressedSize = compressedA.size + compressedB.size;
-
           const form = new FormData();
           form.append("config_id", configSelect.value);
-          form.append("image_a", compressedA);
-          form.append("image_b", compressedB);
           form.append("threshold", threshold.value);
 
-          runHint.textContent = `已压缩上传：${(originalSize / 1024 / 1024).toFixed(2)} MB -> ${(compressedSize / 1024 / 1024).toFixed(2)} MB`;
-          const response = await fetch(apiUrl("api/compare"), { method: "POST", body: form });
-          const data = await readPayload(response);
-          json.textContent = JSON.stringify(data, null, 2);
-
-          if (!response.ok) {
-            throw new Error(data.detail || "compare failed");
+          let endpoint = "api/compare-jobs";
+          if (datasetMode) {
+            form.append("image_a_path", serverImageA.value);
+            form.append("image_b_path", serverImageB.value);
+            endpoint = "api/compare-server-jobs";
+            runHint.textContent = `服务器图片：${serverImageA.value} vs ${serverImageB.value}`;
+          } else {
+            const [compressedA, compressedB] = await Promise.all([
+              compressImageFile(imageA.files[0]),
+              compressImageFile(imageB.files[0]),
+            ]);
+            const originalSize = imageA.files[0].size + imageB.files[0].size;
+            const compressedSize = compressedA.size + compressedB.size;
+            form.append("image_a", compressedA);
+            form.append("image_b", compressedB);
+            runHint.textContent = `已压缩上传：${(originalSize / 1024 / 1024).toFixed(2)} MB -> ${(compressedSize / 1024 / 1024).toFixed(2)} MB，正在创建后台任务。`;
           }
 
+          const response = await fetch(apiUrl(endpoint), { method: "POST", body: form });
+          const job = await readPayload(response);
+          json.textContent = JSON.stringify(job, null, 2);
+
+          if (!response.ok) {
+            throw new Error(job.detail || "failed to create compare job");
+          }
+
+          const data = await pollJob(job.job_id);
           const result = data.result;
           const scoreValue = result.score ?? result.distance;
           score.textContent = typeof scoreValue === "number" ? scoreValue.toFixed(6) : "-";
@@ -571,18 +1114,49 @@
           json.textContent = JSON.stringify({ error: error.message }, null, 2);
         } finally {
           runButton.disabled = false;
-          runHint.textContent = "建议每张图先压缩到 1024px 以内。";
+          updateSourceMode();
         }
       }
 
       imageA.addEventListener("change", () => preview(imageA, "previewA"));
       imageB.addEventListener("change", () => preview(imageB, "previewB"));
+      compareTabButton.addEventListener("click", () => setTab("compare"));
+      evaluateTabButton.addEventListener("click", () => setTab("evaluate"));
+      runEvalButton.addEventListener("click", runEvaluation);
+      refreshEvalJobsButton.addEventListener("click", () => loadEvaluationJobs({ openSelected: true }));
+      evalJobHistory.addEventListener("change", openSelectedEvalJob);
+      sourceMode.addEventListener("change", updateSourceMode);
+      serverImageA.addEventListener("change", () => {
+        previewServerImage(serverImageA.value, "previewA");
+        updateDetectedFaces();
+      });
+      serverImageB.addEventListener("change", () => {
+        previewServerImage(serverImageB.value, "previewB");
+        updateDetectedFaces();
+      });
+      document.querySelectorAll(".preview img").forEach((img) => {
+        img.addEventListener("click", () => {
+          if (!img.src) return;
+          lightboxImage.src = img.src;
+          lightbox.showModal();
+        });
+      });
+      closeLightbox.addEventListener("click", () => lightbox.close());
       configSelect.addEventListener("change", updateConfigMeta);
       runButton.addEventListener("click", runCompare);
       loadConfigs().catch((error) => {
         configStatus.textContent = "Config load failed";
         json.textContent = JSON.stringify({ error: error.message }, null, 2);
       });
+      loadCacheStatus().catch((error) => {
+        cacheStatus.textContent = `Cache status failed: ${error.message}`;
+      });
+      loadDatasetImages()
+        .then(updateSourceMode)
+        .catch((error) => {
+          datasetStatus.textContent = `Dataset load failed: ${error.message}`;
+        });
+      loadEvaluationJobs().catch(() => {});
     </script>
   </body>
 </html>

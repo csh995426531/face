@@ -1,0 +1,13 @@
+.git
+.trellis
+.codex
+.agents
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+.DS_Store
+.data/
+.models/
+datasets/

@@ -226,7 +226,7 @@ image_b=<file>
 - 选定固定模型、detector、metric
 - 完成阈值校准
 - 与 BPSData 历史结果做差异对比
-- 完成小流量 shadow run
+- 完成小流量 service validation run
 - 确认商用 license
 - 固定模型版本和权重来源
 - 禁止运行时自动下载模型权重

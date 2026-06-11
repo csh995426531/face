@@ -1,0 +1,3 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/tasks/06-10-generic-service-task-api/prd.md", "reason": "Generic service task API acceptance criteria"}
+{"file": ".trellis/spec/backend/service-task-api.md", "reason": "Quality gate contract for generic service task API and worker routing"}
